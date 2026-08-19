@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from typing import Protocol
+from urllib.parse import urlsplit
 
 from bulk_enrich.cache import JsonCache
 from bulk_enrich.extract import (
@@ -17,7 +19,49 @@ from bulk_enrich.fetcher import HttpFetcher
 from bulk_enrich.models import CompanyFact, FetchResult, SiteSignal
 
 
-SIGNAL_ENGINE_VERSION = "5"
+SIGNAL_ENGINE_VERSION = "6"
+
+
+_GENERIC_BRAND_SUFFIXES = (
+    "company",
+    "corporation",
+    "holdings",
+    "limited",
+    "services",
+    "service",
+    "group",
+    "inc",
+    "ltd",
+    "llc",
+    "co",
+)
+
+
+def _brand_hint(host: str) -> str:
+    label = host.casefold().removeprefix("www.").split(".", 1)[0]
+    label = re.sub(r"[^a-z0-9]", "", label)
+    for suffix in _GENERIC_BRAND_SUFFIXES:
+        if label.endswith(suffix) and len(label) - len(suffix) >= 5:
+            return label[: -len(suffix)]
+    return label
+
+
+def _redirect_matches_domain(domain: str, final_url: str) -> bool:
+    expected = domain.casefold().strip().rstrip(".").removeprefix("www.")
+    actual = (urlsplit(final_url).hostname or "").casefold().rstrip(".")
+    actual_without_www = actual.removeprefix("www.")
+    if (
+        actual_without_www == expected
+        or actual_without_www.endswith("." + expected)
+        or expected.endswith("." + actual_without_www)
+    ):
+        return True
+    expected_brand = _brand_hint(expected)
+    actual_brand = _brand_hint(actual_without_www)
+    return (
+        min(len(expected_brand), len(actual_brand)) >= 5
+        and (expected_brand in actual_brand or actual_brand in expected_brand)
+    )
 
 
 class PageFetcher(Protocol):
@@ -70,6 +114,19 @@ class SiteEnricher:
                 status="fetch_error",
                 error=home.error or f"HTTP {home.status_code}",
                 pages_fetched=0,
+                http_cache_hits=int(home.from_cache),
+            )
+        if not _redirect_matches_domain(domain, home.final_url or home.url):
+            redirected_host = urlsplit(home.final_url or home.url).hostname or "unknown"
+            return SiteSignal(
+                domain=domain,
+                observation="",
+                evidence="",
+                source_url=home.final_url or home.url,
+                confidence=0.0,
+                status="redirect_mismatch",
+                error=f"homepage redirected to a different company domain: {redirected_host}",
+                pages_fetched=1,
                 http_cache_hits=int(home.from_cache),
             )
 

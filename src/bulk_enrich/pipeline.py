@@ -289,11 +289,17 @@ def _select_focus_candidate(
     """
     if not candidates:
         return None
-    website_confidences = [
-        fact.confidence
-        for _priority, _index, fact, _focus in candidates
-        if not fact.source_url.startswith("input:")
+    website_candidates = [
+        candidate
+        for candidate in candidates
+        if not candidate[2].source_url.startswith("input:")
     ]
+    if not website_candidates:
+        # Configured fallback fields are ordered from most to least authoritative.
+        # Do not let a keyword buried in a later generated field outrank the first
+        # safe company description merely because its niche rule has a lower number.
+        return min(candidates, key=lambda item: (item[1], item[0]))
+    website_confidences = [candidate[2].confidence for candidate in website_candidates]
     website_floor = (
         max(website_confidences) - max_confidence_drop
         if website_confidences
@@ -318,7 +324,10 @@ def _clean_first_name(value: str) -> str:
 
 def _short_company_name(value: str, max_words: int = 4) -> str:
     """Create a subject-safe brand name without legal or export noise."""
-    cleaned = re.split(r"\s*(?:\||\(|\[)", value, maxsplit=1)[0]
+    acronym = re.search(r"\(([A-Z][A-Z0-9&.-]{1,9})\)", value)
+    if acronym:
+        return acronym.group(1).strip(" ,.;:&/-")
+    cleaned = re.split(r"\s*(?:\||\(|\[|[–—]|\s-\s)", value, maxsplit=1)[0]
     words = cleaned.split()
     suffixes = {
         "corp",

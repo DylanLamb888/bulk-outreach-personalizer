@@ -12,17 +12,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class FakeFetcher:
-    def __init__(self, body: str, *, succeeds: bool = True, provider: str = "http") -> None:
+    def __init__(
+        self,
+        body: str,
+        *,
+        succeeds: bool = True,
+        provider: str = "http",
+        final_url: str = "",
+    ) -> None:
         self.body = body
         self.succeeds = succeeds
         self.provider = provider
+        self.final_url = final_url
         self.calls: list[str] = []
 
     def fetch(self, url: str) -> FetchResult:
         self.calls.append(url)
         return FetchResult(
             url=url,
-            final_url=url,
+            final_url=self.final_url or url,
             status_code=200 if self.succeeds else 0,
             content_type="text/html",
             body=self.body if self.succeeds else "",
@@ -91,6 +99,41 @@ class SiteEnricherTests(unittest.TestCase):
             self.assertEqual(signal.status, "ok")
             self.assertEqual(len(direct.calls), 1)
             self.assertEqual(firecrawl.calls, ["https://northstar.example/"])
+
+    def test_rejects_redirect_to_an_unrelated_company_domain(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fetcher = FakeFetcher(
+                (ROOT / "tests" / "fixtures" / "site.html").read_text(),
+                final_url="https://different-company.example/",
+            )
+            enricher = SiteEnricher(
+                fetcher,  # type: ignore[arg-type]
+                JsonCache(Path(tmp)),
+                max_pages=1,
+            )
+
+            signal = enricher.enrich("northstar.example")
+
+            self.assertEqual(signal.status, "redirect_mismatch")
+            self.assertEqual(signal.facts, ())
+            self.assertIn("different-company.example", signal.error)
+
+    def test_allows_brand_preserving_cross_tld_redirect(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fetcher = FakeFetcher(
+                (ROOT / "tests" / "fixtures" / "site.html").read_text(),
+                final_url="https://northstar.ai/",
+            )
+            enricher = SiteEnricher(
+                fetcher,  # type: ignore[arg-type]
+                JsonCache(Path(tmp)),
+                max_pages=1,
+            )
+
+            signal = enricher.enrich("northstar.example")
+
+            self.assertEqual(signal.status, "ok")
+            self.assertTrue(signal.facts)
 
 
 if __name__ == "__main__":

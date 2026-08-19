@@ -157,6 +157,27 @@ class PipelineTests(unittest.TestCase):
         self.assertIsNotNone(selected_with_close_fallback)
         self.assertEqual(selected_with_close_fallback[3].rule_id, "ma-sell-side")
 
+        first_input = candidate(
+            priority=70,
+            index=0,
+            source_url="input:Company description",
+            confidence=0.82,
+            rule_id="cost-segregation",
+        )
+        later_keyword = candidate(
+            priority=20,
+            index=4,
+            source_url="input:Company keywords",
+            confidence=0.72,
+            rule_id="rd-tax-credits",
+        )
+        selected_without_website = _select_focus_candidate(
+            [first_input, later_keyword],
+            max_confidence_drop=0.10,
+        )
+        self.assertIsNotNone(selected_without_website)
+        self.assertEqual(selected_without_website[3].rule_id, "cost-segregation")
+
     def test_wires_optional_firecrawl_fallback_and_manifest_stats(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -269,6 +290,8 @@ class PipelineTests(unittest.TestCase):
             "CapEQ™ | B Corp": "CapEQ™",
             "Antares International Partners, Inc": "Antares International Partners",
             "Berkery, Noyes &": "Berkery, Noyes",
+            "Canadian Society of Customs Brokers (CSCB)": "CSCB",
+            "SPIRIT CHB - Trusted Customs Brokerage": "SPIRIT CHB",
         }
         for raw, expected in examples.items():
             with self.subTest(raw=raw):

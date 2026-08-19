@@ -117,6 +117,8 @@ class CommercialFocusTests(unittest.TestCase):
                 ("The Capital Corporation", "an ability to offer our clients specific expertise"),
                 ("Floodlight Digital", "we would love to hear more about your project"),
                 ("Dickinson Brands", "for over 150 years"),
+                ("United Tax", "the best tax service in the nation"),
+                ("Modern Tax", "partner with Modern for expert compliance solutions"),
             )
             for company_name, source_focus in unsafe:
                 with self.subTest(source_focus=source_focus):

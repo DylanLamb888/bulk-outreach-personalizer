@@ -16,13 +16,14 @@ _WORD_RE = re.compile(r"[A-Za-z0-9]+(?:[&'-][A-Za-z0-9]+)*")
 _YEAR_RE = re.compile(r"\b(?:since|est(?:ablished)?\.?)\s+(?:18|19|20)\d{2}\b", re.I)
 _MORE_RE = re.compile(r"(?:,?\s*(?:&|and)\s+more)\b", re.I)
 _PROMOTIONAL_RE = re.compile(
-    r"\b(?:world[- ]class|industry[- ]leading|market[- ]leading|premier|unique|"
+    r"\b(?:best|world[- ]class|industry[- ]leading|market[- ]leading|premier|unique|"
     r"delicious|forward[- ]thinking|innovative|trusted|leading)\b",
     re.I,
 )
 _TRAILING_PROMO_RE = re.compile(r"\s+with confidence\b", re.I)
+_UNSAFE_SUPERLATIVE_RE = re.compile(r"\b(?:the\s+)?best\b", re.I)
 _LEADING_ACTION_RE = re.compile(
-    r"^(?:helping|supporting|working with|providing|offering|speciali[sz]ing in)\s+",
+    r"^(?:helping|partner(?:ing)? with|supporting|working with|providing|offering|speciali[sz]ing in)\s+",
     re.I,
 )
 _UNSAFE_LEADING_RE = re.compile(
@@ -167,6 +168,8 @@ def _has_specific_category_language(value: str) -> bool:
 
 
 def _generic_focus(source_focus: str, max_words: int) -> str:
+    if _UNSAFE_SUPERLATIVE_RE.search(source_focus):
+        raise CommercialFocusError("generic focus contains an unsupported superlative")
     value = _YEAR_RE.sub("", source_focus)
     value = _MORE_RE.sub("", value)
     value = _PROMOTIONAL_RE.sub("", value)
