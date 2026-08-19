@@ -1,0 +1,7 @@
+interface:
+  display_name: "Bulk Outreach Personalizer"
+  short_description: "Create cached, import-ready outreach personalization"
+  default_prompt: "Use $bulk-outreach-personalizer to validate and personalize this outreach CSV."
+
+policy:
+  allow_implicit_invocation: true

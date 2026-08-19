@@ -7,6 +7,8 @@ description: Validate and run deterministic bulk public-website enrichment for S
 
 Use the repository CLI. Do not write one-off per-row prompts or dispatch an agent for each lead.
 
+Resolve the repository root as two directories above this `SKILL.md`, including when this Skill is reached through a symlink. Run the deterministic entrypoint at `<repository-root>/scripts/enrich.py`; do not assume the user's current working directory is the repository.
+
 ## Workflow
 
 1. Confirm the input CSV, output path, and client campaign JSON.

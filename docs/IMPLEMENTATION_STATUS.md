@@ -3,6 +3,7 @@
 ## Core engine complete
 
 - Portable Claude Code and Codex Skill layout
+- Safe idempotent installer linking one tracked Skill source into both products
 - Python CLI with validation and production modes
 - Offer-agnostic campaign JSON validation
 - Common CSV header mapping and row-order preservation
@@ -25,6 +26,7 @@
 - Complete personalized subject, pitch, and email rendering
 - Atomic CSV and checksummed manifest writing
 - Automated unit and integration tests
+- Clean-room non-M&A integration coverage for client-specific offers and mappings
 - Optional Firecrawl `/scrape` fallback for direct failures and weak page extraction
 - Independent Firecrawl success/failure caching and manifest counters
 - Ordered, campaign-configured input-CSV evidence fallback with explicit source and confidence auditing

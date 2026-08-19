@@ -29,7 +29,18 @@ The engine fetches each unique public company domain once, caches the result, ex
 - atomic CSV output and a checksummed run manifest;
 - no prospect data committed to Git.
 
-## 1. Create a campaign
+## 1. Install the shared Skill
+
+The repository contains one Skill source that can be discovered by both Codex and Claude Code. Preview the personal Skill links, then install them:
+
+```bash
+python scripts/install_skill.py --target both --dry-run
+python scripts/install_skill.py --target both
+```
+
+This creates symlinks under `~/.codex/skills/` and `~/.claude/skills/`. It is idempotent and refuses to overwrite an existing file, directory, or link that points elsewhere. Both tools therefore use the same tracked Skill files and cannot drift into separate copies.
+
+## 2. Create a campaign
 
 Copy `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`, rename both, and update `personalization.focus_rules_file` to the adjacent CSV filename. Replace the offer, approved claims, copy angles, CTA variants, quality thresholds, sender, and market-specific focus rules. Keep the campaign marked `test_only` until the copy has been reviewed.
 
@@ -37,7 +48,7 @@ The Python engine contains no M&A, CFO, recruitment, or client-specific mapping.
 
 The Scale Olympus and Chapman files under `campaigns/examples/` are test examples only.
 
-## 2. Validate the lead file
+## 3. Validate the lead file
 
 ```bash
 python scripts/enrich.py \
@@ -49,7 +60,7 @@ python scripts/enrich.py \
 
 Validation reports the detected columns, missing values, unique domains, duplicate-domain savings, hook rules, and campaign approval state. It does not access websites or write output.
 
-## 3. Run a controlled test
+## 4. Run a controlled test
 
 Use a small CSV first. The flag below is deliberately required while a campaign is marked `test_only`.
 
@@ -63,7 +74,7 @@ python scripts/enrich.py \
 
 Review the final email alongside `personalization_source_focus`, `personalization_focus`, `personalization_buyer_phrase`, `personalization_focus_rule`, `personalization_cta_variant`, evidence, source, angle, template, and quality flags. The source focus preserves the selected website or configured input-row fact; the commercial focus and buyer phrase are the shorter language used in the email. Unsafe unmatched facts are left blank instead of being forced into copy. Approve the campaign only after the copy looks right.
 
-## 4. Run the full list
+## 5. Run the full list
 
 ```bash
 python scripts/enrich.py \
