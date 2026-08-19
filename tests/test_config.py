@@ -10,6 +10,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CampaignConfigTests(unittest.TestCase):
+    def test_schema_v2_is_rejected_with_a_migration_message(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["schema_version"] = "2.0"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "v2.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "migrate.*schema 3.0"):
+                load_campaign(path)
+
     def test_campaign_template_is_valid(self) -> None:
         config = load_campaign(ROOT / "campaigns" / "campaign-template.json")
         self.assertEqual(config.campaign_id, "replace-me")
@@ -80,13 +89,22 @@ class CampaignConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(CampaignConfigError, "confidence"):
                 load_campaign(path)
 
-    def test_candidate_confidence_drop_is_validated(self) -> None:
+    def test_qualification_fallback_fields_must_be_approved_sources(self) -> None:
         payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
-        payload["personalization"]["max_candidate_confidence_drop"] = 1.5
+        payload["qualification"]["company"]["fallback_fields"].append("Unknown field")
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "invalid.json"
             path.write_text(json.dumps(payload))
-            with self.assertRaisesRegex(CampaignConfigError, "confidence_drop"):
+            with self.assertRaisesRegex(CampaignConfigError, "fallback fields"):
+                load_campaign(path)
+
+    def test_invalid_contact_qualification_regex_is_rejected(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["qualification"]["contact"]["ready_title_patterns"] = ["("]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "contact pattern"):
                 load_campaign(path)
 
 

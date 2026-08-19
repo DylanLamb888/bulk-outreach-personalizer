@@ -1,55 +1,55 @@
-id,priority,pattern,signal_types,focus,buyer_phrase
-piano-restoration,10,"\bpiano(?:s)?\b.*\b(?:restoration|repair|refinishing)\b|\b(?:restoration|repair|refinishing)\b.*\bpiano(?:s)?\b",*,piano restoration,piano owners needing restoration
-architectural-salvage,20,"\b(?:architectural salvage|reclaimed fireplace mantels|stained glass windows)\b",*,architectural salvage,architectural salvage buyers
-fundraising-products,30,"\b(?:fundraising|fundraisers|confectionery candy)\b",*,fundraising products,organisations planning fundraisers
-flexible-capital,35,"\bflexible capital(?: solutions)?\b",*,flexible capital solutions,companies looking for flexible capital solutions
-wine-sector-ma,36,"\b(?:wineries?|vineyards?|wine industry)\b",*,wine-sector M&A,winery owners considering a sale
-it-services-ma,36,"\b(?:IT services companies|managed service providers|tech-services firms)\b",*,IT services M&A,IT services firms considering growth or exit
-technology-ma,37,"\b(?:sell-side M&A.{0,60}technology|(?:M&A|mergers? (?:and|&) acquisitions?) advisory.{0,100}(?:information|software|technology)|focused (?:exclusively )?on (?:the )?technology sector|global technology ecosystem)\b",*,technology M&A,technology business owners considering a sale
-cross-border-ma,37,"\bcross-border M&A\b|\bM&A transactions especially between Europe and the United States\b",*,cross-border M&A,companies considering a cross-border transaction
-western-canada-ma,37,"\bM&A advisory across Western Canada\b|\bWestern Canadian (?:businesses|companies|owners)\b",*,Western Canada M&A,Western Canadian owners considering a transaction
-ontario-sell-side,37,"\bselling Ontario-based companies\b|\bOntario-based companies valued\b",*,Ontario sell-side M&A,Ontario owners considering a business sale
-industrial-sector-ma,37,"\bM&A advisory firm focused primarily on the industrial and services sectors\b",*,industrial-sector M&A,industrial business owners considering a transaction
-off-market-origination,36,"\boff-market (?:M&A )?(?:deal flow|deal origination|acquisition opportunities)\b|\bdeal flow for (?:every client|business acquirers)\b",*,off-market deal origination,acquirers looking for off-market opportunities
-canadian-business-sale,36,"\b(?:Canada|Canadian)\b.{0,100}\b(?:buy(?:ing)? or sell(?:ing)?|sell[- ]side|business sales?)\b|\b(?:buy(?:ing)? or sell(?:ing)?|sell[- ]side|business sales?)\b.{0,100}\b(?:Canada|Canadian)\b",*,Canadian business sales,Canadian business owners considering a sale
-uk-business-sale,36,"\b(?:UK-wide|national UK|across the UK)\b.{0,100}\b(?:buyers?|sellers?|business sales?)\b|\b(?:buyers?|sellers?|business sales?)\b.{0,100}\b(?:UK-wide|national UK|across the UK)\b",*,UK business sales,UK business owners considering a sale
-lower-middle-market-ma,37,"\b(?:lower[- ]middle[- ]market|lower to middle market|low-to-mid market)\b.{0,100}\b(?:M&A|mergers? (?:and|&) acquisitions?|transactions?|investment bank)\b|\b(?:M&A|mergers? (?:and|&) acquisitions?|transactions?|investment bank)\b.{0,100}\b(?:lower[- ]middle[- ]market|lower to middle market|low-to-mid market)\b",*,lower-middle-market M&A,lower-middle-market owners considering a transaction
-private-company-sale,37,"\b(?:private|privately held|family-owned|founder-owned)\b.{0,100}\b(?:sell[- ]side|sale|selling)\b|\b(?:sell[- ]side|sale|selling)\b.{0,100}\b(?:private|privately held|family-owned|founder-owned)\b",*,private-company sales,private-company owners considering a sale
-wealth-adviser-transitions,38,"\bpartners? with wealth advisors?\b|\bsupport(?:ing|s)? advisors? by providing.{0,80}(?:valuation|readiness|investment banking)\b",*,business-owner transition support,wealth advisers supporting business-owner transitions
-private-equity-acquisitions,38,"\bprivate equity firm.{0,100}(?:acquir(?:e|ing)|control equity investments?)\b|\bacquir(?:e|ing) middle-market companies\b",*,private equity acquisitions,owners considering a private equity partner
-exit-planning-advisory,39,"\bbusiness owner planning\b|\bbusiness exit planning\b|\bexit planning services?\b",*,business and exit planning,owners planning growth or succession
-ma-two-sided,39,"\bbuy-side\b.{0,60}\bsell-side\b|\bsell-side\b.{0,60}\bbuy-side\b",*,two-sided M&A advisory,owners or acquirers planning a transaction
-business-buy-or-sell,39,"\bbuy(?:ing)?\s+or\s+sell(?:ing)?\b|\b(?:buyers?|acquirers?)\s+and\s+sellers?\b|\bsellers?\s+and\s+(?:buyers?|acquirers?)\b",*,business sale and acquisition advice,business owners and buyers considering a transaction
-ma-sell-side,40,"\bsell[- ]side\b|\bselling .{0,30}\b(?:businesses|companies)\b|\b(?:sell|selling) (?:a|your|their) business\b|\bbusinesses for sale\b|\bbusiness sales?\b",*,sell-side M&A,owners considering a business sale
-ma-buy-side,41,"\bbuy[- ]side\b|\bacquisition origination\b|\bstrategic acquirers?\b|\bidentify and complete strategic investments or acquisitions\b",*,buy-side M&A,acquirers looking for suitable businesses
-capital-raising,42,"\bcapital rais(?:e|ing)\b|\bdebt (?:and|&) equity financing\b|\bequity financing\b|\bcapital structuring\b",*,capital raising,companies looking to raise capital
-business-valuation,43,"\bbusiness valuations?\b|\bvaluation services?\b|\bmarket-based valuations?\b|\bopinions? of value\b",*,business valuation,business owners needing a valuation
-automotive-dealership-brokerage,45,"\bautomotive dealership broker\b|\bdealership owners? considering a sale\b|\bvaluations? for auto groups?\b",*,automotive dealership brokerage,dealership owners considering a sale
-business-brokerage,46,"\bbusiness brokers?\b|\bsold (?:our|a|the) .{0,40}\bbusiness\b|\bwhy use a broker\b|\bowners? considering a (?:business )?sale\b|\bbusiness brokerage\b",*,business brokerage,owners considering a business sale
-investment-banking,47,"\binvestment bank(?:ing)?\b|\bcorporate finance\b|\bstrategic financial advisory\b",*,corporate finance advisory,companies considering financing or a transaction
-ma-advisory,48,"\bM&A\b|\bmergers? (?:and|&) acquisitions?\b|\bprivate capital market\b",*,M&A advisory,business owners considering a transaction
-business-growth,60,"\bcompanies? (?:connect|collaborate).{0,50}\bgrow\b|\bcompanies?.{0,50}\bgrow with confidence\b",*,business growth,companies looking to grow
-owner-financial-guidance,70,"\bowners? make clearer financial decisions\b",*,financial guidance,business owners seeking financial guidance
-premium-tequila,90,"\btequila\b",*,premium tequila,retailers and distributors sourcing tequila
-private-market-funds,100,"\bprivate equity funds?\b|\bco-investments?\b|\bsmall-cap buyout\b|\bsecondaries\b",*,private market investments,investors seeking private market exposure
-venture-private-equity,110,"\bventure capital and private equity\b|\bprivate equity firm\b|\bgrowth capital investments?\b",*,private equity investment,companies seeking an investment partner
-outdoor-renovations,120,"\bdecks?\b|\bpergolas?\b|\bscreened porches?\b|\bsunrooms?\b",*,outdoor living projects,homeowners planning outdoor renovations
-middle-market-financing,130,"\bfinancing (?:for|partner).{0,50}\b(?:lower )?middle market\b|\blower middle market.{0,50}\bfinancing\b",*,lower-middle-market financing,companies seeking flexible financing
-exit-planning-software,140,"\bguide business owners?.{0,50}\bexits?\b|\bbusiness exit planning software\b",*,exit planning software,advisers supporting business owner exits
-specialty-chemicals,150,"\bconcrete sealers?\b|\bwater softening\b|\bpool salts?\b|\bdeicers?\b",*,specialty chemical products,distributors sourcing specialty chemical products
-event-rentals,160,"\bevent rentals?\b|\brentals? for special events?\b|\bparty rentals?\b",*,event rentals,event planners sourcing rental equipment
-property-restoration,170,"\bwater damage\b|\bfire repair\b|\bmold removal\b|\bproperty mitigation\b",*,property restoration,property owners needing restoration
-laboratory-equipment,190,"\bovens? and incubators?\b|\blaboratory ovens?\b|\blab incubators?\b",*,laboratory ovens and incubators,laboratories sourcing ovens or incubators
-kitchen-bath-remodeling,200,"\bkitchen and (?:bath|bathroom) remodeling\b|\bkitchen (?:&|and) bath\b",*,kitchen and bathroom remodeling,homeowners planning a remodel
-shower-doors,210,"\bglass shower doors?\b|\bcustom shower doors?\b",*,custom shower doors,homeowners planning bathroom renovations
-flooring-remodeling,220,"\bflooring store\b|\bcommercial flooring\b|\bflooring and remodeling\b",*,flooring and remodeling,property owners planning renovations
-commercial-construction,230,"\bgeneral contractor\b|\bcommercial construction\b",*,commercial construction,companies planning construction projects
-precision-cutting-tools,250,"\bprecision cutting tools?\b|\bprecision machining and measuring tools?\b",*,precision cutting tools,manufacturers sourcing precision cutting tools
-custom-cnc-parts,260,"\bCNC (?:machined )?parts?\b|\bcustom milled CNC\b|\bscrew machine .{0,20}\bparts?\b",*,custom CNC parts,manufacturers sourcing custom CNC parts
-plant-based-distribution,270,"\bvegetarian products?\b|\bplant-based food wholesaler\b",*,plant-based food distribution,retailers sourcing plant-based products
-commercial-printing,280,"\bprinting company\b|\bcommercial printing\b|\bcatalogs?.{0,30}\bdirect mail\b",*,commercial printing,companies needing print or direct mail
-commercial-security,290,"\bsecurity systems?\b|\bfire alarms?\b|\bcard access\b|\baccess control\b",*,commercial security systems,businesses upgrading security or access control
-witch-hazel-skincare,300,"\bwitch hazel\b|\bskincare.{0,30}\bfirst aid\b",*,witch hazel skincare,retailers sourcing personal care products
-early-stage-investing,310,"\bearly[- ]stage investing\b|\bearly[- ]stage investment\b",*,early-stage investment,founders raising an early-stage round
-commercial-washing,320,"\b(?:mobile|hot water|pressure) washing\b|\bwashing and disinfecting\b",*,commercial washing and disinfection,farms needing washing and disinfection
-wealth-exit-planning,330,"\bwealth management\b|\bfinancial (?:and|&) retirement planning\b|\bwealth creation and preservation\b",*,wealth and exit planning,business owners needing wealth or exit planning
+id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase
+piano-restoration,10,"\bpiano(?:s)?\b.*\b(?:restoration|repair|refinishing)\b|\b(?:restoration|repair|refinishing)\b.*\bpiano(?:s)?\b",*,exclude,piano restoration,piano owners needing restoration
+architectural-salvage,20,"\b(?:architectural salvage|reclaimed fireplace mantels|stained glass windows)\b",*,exclude,architectural salvage,architectural salvage buyers
+fundraising-products,30,"\b(?:fundraising|fundraisers|confectionery candy)\b",*,exclude,fundraising products,organisations planning fundraisers
+flexible-capital,35,"\bflexible capital(?: solutions)?\b",*,secondary,flexible capital solutions,companies looking for flexible capital solutions
+wine-sector-ma,36,"\b(?:wineries?|vineyards?|wine industry)\b",*,core,wine-sector M&A,winery owners considering a sale
+it-services-ma,36,"\b(?:IT services companies|managed service providers|tech-services firms)\b",*,core,IT services M&A,IT services firms considering growth or exit
+technology-ma,37,"\b(?:sell-side M&A.{0,60}technology|(?:M&A|mergers? (?:and|&) acquisitions?) advisory.{0,100}(?:information|software|technology)|focused (?:exclusively )?on (?:the )?technology sector|global technology ecosystem)\b",*,core,technology M&A,technology business owners considering a sale
+cross-border-ma,37,"\bcross-border M&A\b|\bM&A transactions especially between Europe and the United States\b",*,core,cross-border M&A,companies considering a cross-border transaction
+western-canada-ma,37,"\bM&A advisory across Western Canada\b|\bWestern Canadian (?:businesses|companies|owners)\b",*,core,Western Canada M&A,Western Canadian owners considering a transaction
+ontario-sell-side,37,"\bselling Ontario-based companies\b|\bOntario-based companies valued\b",*,core,Ontario sell-side M&A,Ontario owners considering a business sale
+industrial-sector-ma,37,"\bM&A advisory firm focused primarily on the industrial and services sectors\b",*,core,industrial-sector M&A,industrial business owners considering a transaction
+off-market-origination,36,"\boff-market (?:M&A )?(?:deal flow|deal origination|acquisition opportunities)\b|\bdeal flow for (?:every client|business acquirers)\b",*,core,off-market deal origination,acquirers looking for off-market opportunities
+canadian-business-sale,36,"\b(?:Canada|Canadian)\b.{0,100}\b(?:buy(?:ing)? or sell(?:ing)?|sell[- ]side|business sales?)\b|\b(?:buy(?:ing)? or sell(?:ing)?|sell[- ]side|business sales?)\b.{0,100}\b(?:Canada|Canadian)\b",*,core,Canadian business sales,Canadian business owners considering a sale
+uk-business-sale,36,"\b(?:UK-wide|national UK|across the UK)\b.{0,100}\b(?:buyers?|sellers?|business sales?)\b|\b(?:buyers?|sellers?|business sales?)\b.{0,100}\b(?:UK-wide|national UK|across the UK)\b",*,core,UK business sales,UK business owners considering a sale
+lower-middle-market-ma,37,"\b(?:lower[- ]middle[- ]market|lower to middle market|low-to-mid market)\b.{0,100}\b(?:M&A|mergers? (?:and|&) acquisitions?|transactions?|investment bank)\b|\b(?:M&A|mergers? (?:and|&) acquisitions?|transactions?|investment bank)\b.{0,100}\b(?:lower[- ]middle[- ]market|lower to middle market|low-to-mid market)\b",*,core,lower-middle-market M&A,lower-middle-market owners considering a transaction
+private-company-sale,37,"\b(?:private|privately held|family-owned|founder-owned)\b.{0,100}\b(?:sell[- ]side|sale|selling)\b|\b(?:sell[- ]side|sale|selling)\b.{0,100}\b(?:private|privately held|family-owned|founder-owned)\b",*,core,private-company sales,private-company owners considering a sale
+wealth-adviser-transitions,38,"\bpartners? with wealth advisors?\b|\bsupport(?:ing|s)? advisors? by providing.{0,80}(?:valuation|readiness|investment banking)\b",*,secondary,business-owner transition support,wealth advisers supporting business-owner transitions
+private-equity-acquisitions,38,"\bprivate equity firm.{0,100}(?:acquir(?:e|ing)|control equity investments?)\b|\bacquir(?:e|ing) middle-market companies\b",*,secondary,private equity acquisitions,owners considering a private equity partner
+exit-planning-advisory,39,"\bbusiness owner planning\b|\bbusiness exit planning\b|\bexit planning services?\b",*,secondary,business and exit planning,owners planning growth or succession
+ma-two-sided,39,"\bbuy-side\b.{0,60}\bsell-side\b|\bsell-side\b.{0,60}\bbuy-side\b",*,core,two-sided M&A advisory,owners or acquirers planning a transaction
+business-buy-or-sell,39,"\bbuy(?:ing)?\s+or\s+sell(?:ing)?\b|\b(?:buyers?|acquirers?)\s+and\s+sellers?\b|\bsellers?\s+and\s+(?:buyers?|acquirers?)\b",*,core,business sale and acquisition advice,business owners and buyers considering a transaction
+ma-sell-side,40,"\bsell[- ]side\b|\bselling .{0,30}\b(?:businesses|companies)\b|\b(?:sell|selling) (?:a|your|their) business\b|\bbusinesses for sale\b|\bbusiness sales?\b",*,core,sell-side M&A,owners considering a business sale
+ma-buy-side,41,"\bbuy[- ]side\b|\bacquisition origination\b|\bstrategic acquirers?\b|\bidentify and complete strategic investments or acquisitions\b",*,core,buy-side M&A,acquirers looking for suitable businesses
+capital-raising,42,"\bcapital rais(?:e|ing)\b|\bdebt (?:and|&) equity financing\b|\bequity financing\b|\bcapital structuring\b",*,secondary,capital raising,companies looking to raise capital
+business-valuation,43,"\bbusiness valuations?\b|\bvaluation services?\b|\bmarket-based valuations?\b|\bopinions? of value\b",*,secondary,business valuation,business owners needing a valuation
+automotive-dealership-brokerage,45,"\bautomotive dealership broker\b|\bdealership owners? considering a sale\b|\bvaluations? for auto groups?\b",*,core,automotive dealership brokerage,dealership owners considering a sale
+business-brokerage,46,"\bbusiness brokers?\b|\bsold (?:our|a|the) .{0,40}\bbusiness\b|\bwhy use a broker\b|\bowners? considering a (?:business )?sale\b|\bbusiness brokerage\b",*,core,business brokerage,owners considering a business sale
+investment-banking,47,"\binvestment bank(?:ing)?\b|\bcorporate finance\b|\bstrategic financial advisory\b",*,core,corporate finance advisory,companies considering financing or a transaction
+ma-advisory,48,"\bM&A\b|\bmergers? (?:and|&) acquisitions?\b|\bprivate capital market\b",*,core,M&A advisory,business owners considering a transaction
+business-growth,60,"\bcompanies? (?:connect|collaborate).{0,50}\bgrow\b|\bcompanies?.{0,50}\bgrow with confidence\b",*,exclude,business growth,companies looking to grow
+owner-financial-guidance,70,"\bowners? make clearer financial decisions\b",*,exclude,financial guidance,business owners seeking financial guidance
+premium-tequila,90,"\btequila\b",*,exclude,premium tequila,retailers and distributors sourcing tequila
+private-market-funds,100,"\bprivate equity funds?\b|\bco-investments?\b|\bsmall-cap buyout\b|\bsecondaries\b",*,secondary,private market investments,investors seeking private market exposure
+venture-private-equity,110,"\bventure capital and private equity\b|\bprivate equity firm\b|\bgrowth capital investments?\b",*,secondary,private equity investment,companies seeking an investment partner
+outdoor-renovations,120,"\bdecks?\b|\bpergolas?\b|\bscreened porches?\b|\bsunrooms?\b",*,exclude,outdoor living projects,homeowners planning outdoor renovations
+middle-market-financing,130,"\bfinancing (?:for|partner).{0,50}\b(?:lower )?middle market\b|\blower middle market.{0,50}\bfinancing\b",*,secondary,lower-middle-market financing,companies seeking flexible financing
+exit-planning-software,140,"\bguide business owners?.{0,50}\bexits?\b|\bbusiness exit planning software\b",*,secondary,exit planning software,advisers supporting business owner exits
+specialty-chemicals,150,"\bconcrete sealers?\b|\bwater softening\b|\bpool salts?\b|\bdeicers?\b",*,exclude,specialty chemical products,distributors sourcing specialty chemical products
+event-rentals,160,"\bevent rentals?\b|\brentals? for special events?\b|\bparty rentals?\b",*,exclude,event rentals,event planners sourcing rental equipment
+property-restoration,170,"\bwater damage\b|\bfire repair\b|\bmold removal\b|\bproperty mitigation\b",*,exclude,property restoration,property owners needing restoration
+laboratory-equipment,190,"\bovens? and incubators?\b|\blaboratory ovens?\b|\blab incubators?\b",*,exclude,laboratory ovens and incubators,laboratories sourcing ovens or incubators
+kitchen-bath-remodeling,200,"\bkitchen and (?:bath|bathroom) remodeling\b|\bkitchen (?:&|and) bath\b",*,exclude,kitchen and bathroom remodeling,homeowners planning a remodel
+shower-doors,210,"\bglass shower doors?\b|\bcustom shower doors?\b",*,exclude,custom shower doors,homeowners planning bathroom renovations
+flooring-remodeling,220,"\bflooring store\b|\bcommercial flooring\b|\bflooring and remodeling\b",*,exclude,flooring and remodeling,property owners planning renovations
+commercial-construction,230,"\bgeneral contractor\b|\bcommercial construction\b",*,exclude,commercial construction,companies planning construction projects
+precision-cutting-tools,250,"\bprecision cutting tools?\b|\bprecision machining and measuring tools?\b",*,exclude,precision cutting tools,manufacturers sourcing precision cutting tools
+custom-cnc-parts,260,"\bCNC (?:machined )?parts?\b|\bcustom milled CNC\b|\bscrew machine .{0,20}\bparts?\b",*,exclude,custom CNC parts,manufacturers sourcing custom CNC parts
+plant-based-distribution,270,"\bvegetarian products?\b|\bplant-based food wholesaler\b",*,exclude,plant-based food distribution,retailers sourcing plant-based products
+commercial-printing,280,"\bprinting company\b|\bcommercial printing\b|\bcatalogs?.{0,30}\bdirect mail\b",*,exclude,commercial printing,companies needing print or direct mail
+commercial-security,290,"\bsecurity systems?\b|\bfire alarms?\b|\bcard access\b|\baccess control\b",*,exclude,commercial security systems,businesses upgrading security or access control
+witch-hazel-skincare,300,"\bwitch hazel\b|\bskincare.{0,30}\bfirst aid\b",*,exclude,witch hazel skincare,retailers sourcing personal care products
+early-stage-investing,310,"\bearly[- ]stage investing\b|\bearly[- ]stage investment\b",*,exclude,early-stage investment,founders raising an early-stage round
+commercial-washing,320,"\b(?:mobile|hot water|pressure) washing\b|\bwashing and disinfecting\b",*,exclude,commercial washing and disinfection,farms needing washing and disinfection
+wealth-exit-planning,330,"\bwealth management\b|\bfinancial (?:and|&) retirement planning\b|\bwealth creation and preservation\b",*,secondary,wealth and exit planning,business owners needing wealth or exit planning

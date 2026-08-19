@@ -23,17 +23,31 @@ The CLI preserves every input column and row order, then appends the campaign's 
 | `personalization_quality_flags` | Batch repetition warnings or other copy-QA flags |
 | `personalization_status` | `ready`, `review`, `blank`, or `error` |
 | `personalization_error` | Missing data, weak evidence, fetch, or render issue |
+| `company_fit_status` | `qualified`, `review`, or `excluded` company decision |
+| `company_fit_tier` | Selected `core`, `secondary`, `exclude`, or `none` tier |
+| `company_fit_rule` | Campaign rule responsible for the company decision |
+| `company_fit_source` | First-party URL or approved `input:<header>` evidence source |
+| `company_fit_evidence` | Evidence used for company qualification |
+| `company_fit_reason` | Deterministic explanation of the company decision |
+| `contact_fit_status` | Contact-title and seniority decision |
+| `contact_fit_rule` | Matching title/seniority rule |
+| `contact_fit_reason` | Deterministic explanation of the contact decision |
+| `email_fit_status` | Email syntax/provider-status decision |
+| `email_fit_rule` | Matching email policy rule |
+| `email_fit_reason` | Deterministic explanation of the email decision |
+| `outreach_status` | Final `ready`, `review`, `excluded`, or `error` decision |
+| `outreach_reason` | Combined explanation for the final decision |
 
 ## Status rules
 
-- `ready`: source evidence passed the campaign confidence threshold and required lead fields are present.
-- `review`: a line was rendered but the evidence, lead fields, or batch copy QA needs human review.
-- `blank`: website evidence exists, but no safe commercial focus passed the configured rules.
-- `error`: neither the domain nor configured input fields produced usable evidence.
+- `ready`: company, contact, email, and copy all passed their campaign gates.
+- `review`: no gate failed, but at least one gate or copy check requires human review.
+- `excluded`: at least one company, contact, email, or duplicate gate failed; send copy is blank.
+- `error`: technical rendering failed after the qualification gates passed.
 
 Only `ready` rows should be uploaded without review.
 
-Pass `--ready-output /path/to/smartlead-ready.csv` to write a second file containing only those rows while retaining the full audit CSV separately.
+Pass `--ready-output /path/to/smartlead-ready.csv` for upload-safe rows and `--review-output /path/to/manual-review.csv` for reviewable rendered rows while retaining the complete audit CSV.
 
 ## Run manifest
 
@@ -45,8 +59,10 @@ Every output receives a JSON manifest containing:
 - duplicate requests avoided;
 - page and signal cache usage;
 - status counts and fetch statistics;
+- company, contact, email, final-status, duplicate-email, and rule-usage counts;
 - copy-quality evaluation, warning counts, and flagged-row counts;
 - opening, exact-pitch, buyer-phrase, and CTA concentration warnings;
 - the exact non-secret run settings.
+- immutable copies and hashes of the campaign JSON and focus CSV used for the run.
 
 Generated CSVs belong under `outputs/`; cache data belongs under `var/`. Both are excluded from Git because they can contain prospect or client information.

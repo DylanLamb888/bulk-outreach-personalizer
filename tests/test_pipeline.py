@@ -16,7 +16,8 @@ from bulk_enrich.pipeline import (
     _balanced_ctas,
     _build_copy,
     _clean_first_name,
-    _select_focus_candidate,
+    _immutable_snapshot,
+    _select_company_candidate,
     _short_company_name,
     run_enrichment,
 )
@@ -36,8 +37,8 @@ class FakeDomainEnricher:
         confidence = 0.90 if domain == "northstar.example" else 0.68
         return SiteSignal(
             domain=domain,
-            observation="your team helps owners make clearer financial decisions",
-            evidence="We help owners make clearer financial decisions",
+            observation="your team advises private owners on sell-side M&A",
+            evidence="We provide sell-side M&A advisory to private company owners",
             source_url=f"https://{domain}/",
             confidence=confidence,
             status="ok",
@@ -92,10 +93,119 @@ class FailedDomainEnricher:
         )
 
 
+class MappingDomainEnricher:
+    focuses = {
+        "off.example": "commercial washing and disinfection",
+        "core.example": "sell-side M&A advisory for private company owners",
+        "secondary.example": "flexible capital solutions",
+    }
+
+    def enrich(self, domain: str) -> SiteSignal:
+        focus = self.focuses[domain]
+        fact = CompanyFact(
+            signal_type="service",
+            focus=focus,
+            observation=focus,
+            evidence=focus,
+            source_url=f"https://{domain}/services",
+            confidence=0.90,
+        )
+        return SiteSignal(
+            domain=domain,
+            observation=focus,
+            evidence=focus,
+            source_url=fact.source_url,
+            confidence=fact.confidence,
+            status="ok",
+            facts=(fact,),
+        )
+
+
 class PipelineTests(unittest.TestCase):
-    def test_focus_selection_keeps_weak_csv_fallback_behind_website_evidence(self) -> None:
+    def test_configuration_snapshots_are_content_addressed_and_immutable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "campaign.json"
+            output = tmp_path / "audit.csv"
+            source.write_text('{"version": 1}\n', encoding="utf-8")
+
+            first_path, first_hash = _immutable_snapshot(source, output, "campaign")
+            repeated_path, repeated_hash = _immutable_snapshot(
+                source,
+                output,
+                "campaign",
+            )
+            self.assertEqual((first_path, first_hash), (repeated_path, repeated_hash))
+            self.assertIn(first_hash, first_path.name)
+
+            source.write_text('{"version": 2}\n', encoding="utf-8")
+            second_path, second_hash = _immutable_snapshot(source, output, "campaign")
+            self.assertNotEqual(first_path, second_path)
+            self.assertNotEqual(first_hash, second_hash)
+            self.assertEqual(first_path.read_text(encoding="utf-8"), '{"version": 1}\n')
+
+    def test_qualification_outputs_deduplicate_and_snapshot_the_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            input_path = tmp_path / "leads.csv"
+            input_path.write_text(
+                "Email,Email status,First name,Job title,Job seniority,Company name,Website\n"
+                "shared@example.com,VERIFIED,Amy,Owner,Founder/Owner,Off Niche,off.example\n"
+                "shared@example.com,VERIFIED,Ben,Founder,Founder/Owner,Core Adviser,core.example\n"
+                "review@example.com,VERIFIED,Casey,Director of Business Development,Director,Secondary Capital,secondary.example\n",
+                encoding="utf-8",
+            )
+            output = tmp_path / "audit.csv"
+            ready_output = tmp_path / "ready.csv"
+            review_output = tmp_path / "review.csv"
+            campaign = load_campaign(
+                ROOT / "campaigns" / "examples" / "scale-olympus.json"
+            )
+            manifest = run_enrichment(
+                input_path=input_path,
+                output_path=output,
+                campaign=campaign,
+                title_hooks=TitleHookTable.load(ROOT / "config" / "title-hooks.csv"),
+                commercial_focuses=CommercialFocusTable.load(campaign.focus_rules_path),
+                options=RunOptions(
+                    cache_dir=tmp_path / "cache",
+                    ready_output_path=ready_output,
+                    review_output_path=review_output,
+                ),
+                domain_enricher=MappingDomainEnricher(),
+            )
+
+            with output.open(encoding="utf-8-sig", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+            with ready_output.open(encoding="utf-8-sig", newline="") as handle:
+                ready_rows = list(csv.DictReader(handle))
+            with review_output.open(encoding="utf-8-sig", newline="") as handle:
+                review_rows = list(csv.DictReader(handle))
+
+            self.assertEqual([row["outreach_status"] for row in rows], ["excluded", "ready", "review"])
+            self.assertEqual(rows[0]["email_fit_rule"], "duplicate-email")
+            self.assertEqual(rows[0]["personalized_email"], "")
+            self.assertEqual(rows[1]["company_fit_tier"], "core")
+            self.assertTrue(rows[1]["personalized_email"])
+            self.assertEqual(rows[2]["company_fit_tier"], "secondary")
+            self.assertTrue(rows[2]["personalized_email"])
+            self.assertEqual(len(ready_rows), 1)
+            self.assertEqual(len(review_rows), 1)
+            self.assertEqual(manifest["qualification"]["duplicate_email_rows_excluded"], 1)
+            self.assertTrue(Path(manifest["campaign"]["snapshot_path"]).is_file())
+            self.assertTrue(
+                Path(manifest["settings"]["commercial_focus_snapshot_path"]).is_file()
+            )
+
+    def test_company_selection_prefers_first_party_and_corroborated_csv(self) -> None:
         def candidate(
-            *, priority: int, index: int, source_url: str, confidence: float, rule_id: str
+            *,
+            priority: int,
+            index: int,
+            source_url: str,
+            confidence: float,
+            rule_id: str,
+            fit_tier: str = "core",
         ) -> tuple[int, int, CompanyFact, CommercialFocusResult]:
             fact = CompanyFact(
                 signal_type="service",
@@ -111,72 +221,66 @@ class PipelineTests(unittest.TestCase):
                 buyer_phrase="companies considering a transaction",
                 rule_id=rule_id,
                 priority=priority,
+                fit_tier=fit_tier,
             )
             return priority, index, fact, focus
 
-        website_generic = candidate(
+        campaign = load_campaign(
+            ROOT / "campaigns" / "examples" / "scale-olympus.json"
+        )
+        website = candidate(
             priority=48,
             index=0,
             source_url="https://example.com/",
             confidence=0.88,
             rule_id="ma-advisory",
         )
-        website_specific = candidate(
-            priority=41,
-            index=1,
-            source_url="https://example.com/services",
-            confidence=0.70,
-            rule_id="ma-buy-side",
-        )
-        weak_fallback = candidate(
+        csv_description = candidate(
             priority=30,
-            index=2,
-            source_url="input:AI Description",
-            confidence=0.76,
-            rule_id="fundraising-products",
-        )
-        close_fallback = candidate(
-            priority=40,
-            index=3,
+            index=1,
             source_url="input:Company description",
             confidence=0.82,
             rule_id="ma-sell-side",
         )
-
-        selected = _select_focus_candidate(
-            [website_generic, website_specific, weak_fallback],
-            max_confidence_drop=0.10,
-        )
-        self.assertIsNotNone(selected)
-        self.assertEqual(selected[3].rule_id, "ma-buy-side")
-
-        selected_with_close_fallback = _select_focus_candidate(
-            [website_generic, close_fallback],
-            max_confidence_drop=0.10,
-        )
-        self.assertIsNotNone(selected_with_close_fallback)
-        self.assertEqual(selected_with_close_fallback[3].rule_id, "ma-sell-side")
-
-        first_input = candidate(
-            priority=70,
-            index=0,
-            source_url="input:Company description",
-            confidence=0.82,
-            rule_id="cost-segregation",
-        )
-        later_keyword = candidate(
-            priority=20,
-            index=4,
+        csv_keywords = candidate(
+            priority=30,
+            index=2,
             source_url="input:Company keywords",
             confidence=0.72,
-            rule_id="rd-tax-credits",
+            rule_id="ma-sell-side",
         )
-        selected_without_website = _select_focus_candidate(
-            [first_input, later_keyword],
-            max_confidence_drop=0.10,
+
+        selected, fields = _select_company_candidate(
+            [website, csv_description, csv_keywords],
+            campaign,
         )
-        self.assertIsNotNone(selected_without_website)
-        self.assertEqual(selected_without_website[3].rule_id, "cost-segregation")
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected[2].source_url, "https://example.com/")
+        self.assertEqual(fields, ())
+
+        unmatched_website = candidate(
+            priority=1000,
+            index=0,
+            source_url="https://unclear.example/",
+            confidence=0.88,
+            rule_id="generic-compression",
+            fit_tier="exclude",
+        )
+        selected, fields = _select_company_candidate(
+            [unmatched_website, csv_description, csv_keywords],
+            campaign,
+        )
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected[3].rule_id, "generic-compression")
+        self.assertEqual(fields, ())
+
+        selected, fields = _select_company_candidate(
+            [csv_description, csv_keywords],
+            campaign,
+        )
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected[3].rule_id, "ma-sell-side")
+        self.assertEqual(fields, ("Company description", "Company keywords"))
 
     def test_wires_optional_firecrawl_fallback_and_manifest_stats(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -359,19 +463,19 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(len(rows), 3)
             self.assertEqual(rows[0]["Email"], "ana@example.com")
             self.assertEqual(rows[0]["personalization_status"], "ready")
-            self.assertIn("business owners seeking financial guidance", rows[0]["personalized_pitch"])
+            self.assertIn("private-company owners considering a sale", rows[0]["personalized_pitch"])
             self.assertIn("only charge per qualified call", rows[0]["personalized_email"])
             self.assertIn("Dylan", rows[0]["personalized_email"])
-            self.assertEqual(rows[0]["personalization_signal_type"], "audience")
+            self.assertEqual(rows[0]["personalization_signal_type"], "service")
             self.assertTrue(rows[0]["personalization_angle"])
             self.assertTrue(rows[0]["personalization_template"])
-            self.assertEqual(rows[0]["personalization_source_focus"], "helping owners make clearer financial decisions")
-            self.assertEqual(rows[0]["personalization_focus"], "financial guidance")
+            self.assertEqual(rows[0]["personalization_source_focus"], "sell-side M&A advisory to private company owners")
+            self.assertEqual(rows[0]["personalization_focus"], "private-company sales")
             self.assertEqual(
                 rows[0]["personalization_buyer_phrase"],
-                "business owners seeking financial guidance",
+                "private-company owners considering a sale",
             )
-            self.assertEqual(rows[0]["personalization_focus_rule"], "owner-financial-guidance")
+            self.assertEqual(rows[0]["personalization_focus_rule"], "private-company-sale")
             self.assertIn(
                 rows[0]["personalization_cta_variant"],
                 {item.variant_id for item in load_campaign(
@@ -380,20 +484,21 @@ class PipelineTests(unittest.TestCase):
             )
             self.assertIn(rows[0]["personalization_cta"], rows[0]["personalized_email"])
             self.assertEqual(rows[0]["personalization_quality_flags"], "")
-            self.assertEqual(rows[2]["personalization_status"], "review")
-            self.assertIn("missing email", rows[2]["personalization_error"])
+            self.assertEqual(rows[2]["personalization_status"], "blank")
+            self.assertEqual(rows[2]["outreach_status"], "excluded")
+            self.assertIn("email is missing", rows[2]["outreach_reason"])
 
             with ready_output.open("r", encoding="utf-8-sig", newline="") as handle:
                 ready_rows = list(csv.DictReader(handle))
             self.assertEqual(len(ready_rows), 2)
-            self.assertTrue(all(row["personalization_status"] == "ready" for row in ready_rows))
+            self.assertTrue(all(row["outreach_status"] == "ready" for row in ready_rows))
             self.assertTrue(all(row["personalization_cta"] for row in ready_rows))
 
             saved_manifest = json.loads(manifest_path.read_text())
-            self.assertEqual(saved_manifest["output"]["status_counts"], {"ready": 2, "review": 1})
+            self.assertEqual(saved_manifest["output"]["status_counts"], {"excluded": 1, "ready": 2})
             self.assertEqual(saved_manifest["output"]["ready_upload"]["row_count"], 2)
             self.assertFalse(saved_manifest["quality"]["evaluated"])
-            self.assertEqual(saved_manifest["quality"]["unique_rendered_domains"], 2)
+            self.assertEqual(saved_manifest["quality"]["unique_rendered_domains"], 1)
 
     def test_uses_a_safe_secondary_fact_when_primary_is_website_copy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -435,9 +540,10 @@ class PipelineTests(unittest.TestCase):
             tmp_path = Path(tmp)
             input_path = tmp_path / "lead.csv"
             input_path.write_text(
-                "Email,First name,Job title,Company name,Website,Company description\n"
+                "Email,First name,Job title,Company name,Website,Company description,Company keywords\n"
                 "ana@example.com,Ana,Founder,Northstar Capital,northstar.example,"
-                '"Northstar provides sell-side M&A advisory to private companies."\n',
+                '"Northstar provides sell-side M&A advisory to private companies.",'
+                '"private company sell-side M&A advisory"\n',
                 encoding="utf-8",
             )
             output = tmp_path / "enriched.csv"
@@ -457,6 +563,7 @@ class PipelineTests(unittest.TestCase):
             with output.open("r", encoding="utf-8-sig", newline="") as handle:
                 row = next(csv.DictReader(handle))
             self.assertEqual(row["personalization_status"], "ready")
+            self.assertEqual(row["outreach_status"], "review")
             self.assertEqual(row["personalization_source"], "input:Company description")
             self.assertEqual(row["personalization_confidence"], "0.82")
             self.assertEqual(row["personalization_focus_rule"], "private-company-sale")
@@ -484,9 +591,19 @@ class PipelineTests(unittest.TestCase):
             campaign_path = tmp_path / "campaign.json"
             campaign_path.write_text(json.dumps(payload))
             output = tmp_path / "enriched.csv"
+            input_path = tmp_path / "batch.csv"
+            input_path.write_text(
+                (ROOT / "tests" / "fixtures" / "leads.csv")
+                .read_text(encoding="utf-8")
+                .replace(
+                    ",Morgan,Jones,Owner,Harbour Advisory,harbour.example",
+                    "morgan@example.com,Morgan,Jones,Owner,Harbour Advisory,harbour.example",
+                ),
+                encoding="utf-8",
+            )
 
             manifest = run_enrichment(
-                input_path=ROOT / "tests" / "fixtures" / "leads.csv",
+                input_path=input_path,
                 output_path=output,
                 campaign=load_campaign(campaign_path),
                 title_hooks=TitleHookTable.load(ROOT / "config" / "title-hooks.csv"),

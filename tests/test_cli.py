@@ -56,6 +56,12 @@ class CliTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(payload["input"]["unique_domain_count"], 2)
             self.assertGreaterEqual(payload["commercial_focus_rules"], 7)
+            self.assertIn("company_fit_tiers", payload["qualification"])
+            self.assertEqual(
+                payload["qualification"]["missing_email_status_action"],
+                "syntax",
+            )
+            self.assertFalse(payload["input"]["email_status_present"])
             self.assertFalse(payload["execution_ready"])
             self.assertIn("test_only", payload["execution_blocker"])
             self.assertFalse(output.exists())

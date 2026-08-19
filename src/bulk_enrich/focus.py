@@ -255,6 +255,7 @@ class CommercialFocusRule:
     priority: int
     pattern: re.Pattern[str]
     signal_types: tuple[str, ...]
+    fit_tier: str
     focus: str
     buyer_phrase: str
 
@@ -266,6 +267,7 @@ class CommercialFocusResult:
     buyer_phrase: str
     rule_id: str
     priority: int
+    fit_tier: str = "core"
 
 
 @dataclass(frozen=True)
@@ -279,7 +281,15 @@ class CommercialFocusTable:
         if not resolved.is_file():
             raise CommercialFocusError(f"commercial focus file not found: {resolved}")
 
-        expected = {"id", "priority", "pattern", "signal_types", "focus", "buyer_phrase"}
+        expected = {
+            "id",
+            "priority",
+            "pattern",
+            "signal_types",
+            "fit_tier",
+            "focus",
+            "buyer_phrase",
+        }
         rules: list[CommercialFocusRule] = []
         seen: set[str] = set()
         with resolved.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -310,14 +320,22 @@ class CommercialFocusTable:
                     raise CommercialFocusError(
                         f"commercial focus signal_types is blank on line {line_number}"
                     )
+                fit_tier = row["fit_tier"].strip().casefold()
+                if fit_tier not in {"core", "secondary", "exclude"}:
+                    raise CommercialFocusError(
+                        f"commercial focus fit_tier must be core, secondary, or exclude on line {line_number}"
+                    )
                 focus = _validate_phrase(row["focus"], "mapped focus", 12)
-                buyer_phrase = _validate_phrase(row["buyer_phrase"], "mapped buyer phrase", 16)
+                buyer_phrase = _validate_phrase(
+                    row["buyer_phrase"], "mapped buyer phrase", 16
+                )
                 rules.append(
                     CommercialFocusRule(
                         rule_id=rule_id,
                         priority=priority,
                         pattern=pattern,
                         signal_types=signal_types,
+                        fit_tier=fit_tier,
                         focus=focus,
                         buyer_phrase=buyer_phrase,
                     )
@@ -354,6 +372,7 @@ class CommercialFocusTable:
                 ),
                 rule_id=rule.rule_id,
                 priority=rule.priority,
+                fit_tier=rule.fit_tier,
             )
 
         focus = _generic_focus(source_focus, max_focus_words)
@@ -373,6 +392,7 @@ class CommercialFocusTable:
             ),
             rule_id="generic-compression",
             priority=1_000_000,
+            fit_tier="exclude",
         )
 
 

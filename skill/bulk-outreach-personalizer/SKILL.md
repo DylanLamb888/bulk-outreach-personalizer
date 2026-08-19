@@ -12,14 +12,15 @@ Resolve the repository root as two directories above this `SKILL.md`, including 
 ## Workflow
 
 1. Confirm the input CSV, output path, and client campaign JSON.
-2. For a new client, copy both `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`. Rename both, point `personalization.focus_rules_file` at the adjacent CSV, and add only client-approved offer claims, restrictions, sender, CTA variants, copy, and target-market mappings.
-3. Run `--validate-only` and report row count, missing required values, unique domains, duplicate-domain savings, and campaign status.
-4. Run a small test with `--allow-test-campaign`; compare the source focus with the compressed focus and buyer phrase, then inspect the selected CTA variant, rule, angle, template, evidence, source, confidence, quality flags, and final emails.
-5. Do not mark a campaign `approved` without the user's copy approval.
-6. Run the full list, then report the output CSV, manifest, and counts for `ready`, `review`, `blank`, and `error`.
-7. Treat only `ready` rows as upload-ready unless the user explicitly reviews the others.
+2. For a new client, inspect 10–20 representative development domains plus adjacent negative examples. Draft the campaign's `core`, `secondary`, and `exclude` company rules, required contact titles/seniorities, accepted email statuses, and approved CSV fallback fields. Show these rules to the user and obtain approval before freezing them. This setup assistance may use Claude or Codex; the bulk CLI must never make per-row AI calls.
+3. Copy both `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`. Rename both, point `personalization.focus_rules_file` at the adjacent CSV, and add only approved qualification rules, offer claims, restrictions, sender, CTA variants, and copy.
+4. Run `--validate-only` and report row count, detected qualification columns, missing verification values, duplicate emails, unique domains, duplicate-domain savings, rule tiers, and campaign status.
+5. Run a small test with `--allow-test-campaign`; inspect company, contact, email, copy, and final outreach statuses alongside their rules, evidence, reasons, and final emails. Include unseen holdout and adjacent-negative examples.
+6. Do not mark a campaign `approved` without the user's qualification and copy approval.
+7. Run the full list with separate audit, ready, and review outputs. Report `ready`, `review`, `excluded`, and `error` counts plus duplicate exclusions.
+8. Treat only `outreach_status=ready` rows as upload-ready. Never upload or send automatically.
 
-When configured, the engine uses input-CSV company intelligence only after website facts fail to map safely. Keep `personalization.row_fallback.fields` generic and campaign-approved, assign lower confidence than first-party website evidence, and let the campaign focus CSV convert those fields into market-specific buyer language. The audit source must remain `input:<header>` so website and supplied-data evidence are never confused.
+When configured, the engine uses input-CSV company intelligence only when first-party website evidence is unavailable. A readable website with no campaign match is excluded rather than rescued by CSV enrichment. CSV-only company evidence must map to the same rule in at least two approved fields and remains review-only. The audit source must remain `input:<header>` so website and supplied-data evidence are never confused.
 
 Keep direct HTTP as the default. When Firecrawl is configured, enable `--firecrawl-fallback` only as a second pass for failed or weak pages. The CLI reads a self-hosted `FIRECRAWL_API_URL` from the repository's ignored `.env` file; shell variables take precedence. Hosted use reads `FIRECRAWL_API_KEY` from the shell environment. Never request, print, persist, or place API keys in campaign files or CLI arguments. Report the direct and Firecrawl request/cache counts separately from the manifest.
 

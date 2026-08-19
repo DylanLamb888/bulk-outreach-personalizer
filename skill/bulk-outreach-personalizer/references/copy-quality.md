@@ -17,11 +17,12 @@ Use website facts inside the commercial question or offer. Do not lead with a se
 - Keep several approved CTA structures when the campaign has a genuinely useful asset to offer. Balance them deterministically across each batch, independently from the pitch template; do not use random synonym spinning.
 - Never offer to show the opening line after the email has already displayed it. Each CTA must offer a distinct, deliverable next asset.
 - Clean provider-added middle initials from greetings and legal suffixes, parentheticals, separators, or dangling connectors from subject-line company names.
-- Prefer the most specific configured focus rule supported by the evidence, even when it comes from a later candidate fact. Keep CSV fallbacks within `max_candidate_confidence_drop` of the strongest website fact so weaker generated descriptions cannot override stronger public evidence. Never let the company name alone prove the category.
+- Prefer the most specific configured focus rule supported by first-party evidence. Use CSV fallback only when website evidence is unavailable, require the approved number of fields to agree on the same rule, and keep the result review-only. A company name may corroborate another approved field but must never qualify alone.
 - Do not repeat the same opening structure in the personalized pitch and CTA within one email.
 - Prefer low-friction, value-based CTAs that offer something specific. Do not ask for a call unless the campaign explicitly requires that CTA.
 - Include only client-approved claims. Never infer prospect intent, pain, growth plans, sale intent, performance, or customer relationships.
 - Leave the row blank when no rule or complete neutral category can safely express buyer intent.
+- Treat generic compression as audit context only: unmatched evidence is not proof of campaign fit and must be excluded from the ready output.
 - Put overused openings and client-specific exclusions in `banned_phrases`.
 - Keep multiple approved sentence structures per common angle. Select them deterministically by domain and monitor opening frequency across the batch.
 

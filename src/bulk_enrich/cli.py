@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 from bulk_enrich import __version__
@@ -89,7 +90,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--ready-output",
-        help="Optional second CSV containing only rows marked ready",
+        help="Optional second CSV containing only rows marked outreach-ready",
+    )
+    parser.add_argument(
+        "--review-output",
+        help="Optional second CSV containing only rows requiring manual review",
     )
     parser.add_argument(
         "--concurrency",
@@ -210,6 +215,17 @@ def _validation_payload(
         "title_hook_rules": len(hooks.rules),
         "commercial_focus_rules": len(focuses.rules),
         "commercial_focus_path": str(focuses.path),
+        "qualification": {
+            "company_fit_tiers": dict(
+                sorted(Counter(rule.fit_tier for rule in focuses.rules).items())
+            ),
+            "fallback_min_agreeing_fields": campaign.fallback_min_agreeing_fields,
+            "fallback_fields": list(campaign.fallback_qualification_fields),
+            "ready_title_patterns": len(campaign.ready_title_patterns),
+            "review_title_patterns": len(campaign.review_title_patterns),
+            "exclude_title_patterns": len(campaign.excluded_title_patterns),
+            "missing_email_status_action": campaign.missing_email_status_action,
+        },
         "copy_angles": len(campaign.angles),
         "copy_templates": template_count,
         "banned_phrases": len(campaign.banned_phrases),
@@ -302,6 +318,11 @@ def main(argv: list[str] | None = None) -> int:
                         if args.ready_output
                         else None
                     ),
+                    review_output_path=(
+                        Path(args.review_output).expanduser().resolve()
+                        if args.review_output
+                        else None
+                    ),
                 ),
                 progress=progress,
             )
@@ -312,6 +333,7 @@ def main(argv: list[str] | None = None) -> int:
                 "domains": manifest["domains"],
                 "http": manifest["http"],
                 "firecrawl": manifest["firecrawl"],
+                "qualification": manifest["qualification"],
                 "duration_seconds": manifest["run"]["duration_seconds"],
             }
     except (

@@ -84,8 +84,8 @@ class CommercialFocusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "focus.csv"
             path.write_text(
-                "id,priority,pattern,signal_types,focus,buyer_phrase\n"
-                "never,1,will-not-match,*,safe category,safe buyers\n",
+                "id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase\n"
+                "never,1,will-not-match,*,core,safe category,safe buyers\n",
                 encoding="utf-8",
             )
             table = CommercialFocusTable.load(path)
@@ -105,8 +105,8 @@ class CommercialFocusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "focus.csv"
             path.write_text(
-                "id,priority,pattern,signal_types,focus,buyer_phrase\n"
-                "never,1,will-not-match,*,safe category,safe buyers\n",
+                "id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase\n"
+                "never,1,will-not-match,*,core,safe category,safe buyers\n",
                 encoding="utf-8",
             )
             table = CommercialFocusTable.load(path)
@@ -136,8 +136,8 @@ class CommercialFocusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "focus.csv"
             path.write_text(
-                "id,priority,pattern,signal_types,focus,buyer_phrase\n"
-                "never,1,will-not-match,*,safe category,safe buyers\n",
+                "id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase\n"
+                "never,1,will-not-match,*,core,safe category,safe buyers\n",
                 encoding="utf-8",
             )
             table = CommercialFocusTable.load(path)
@@ -275,8 +275,8 @@ class CommercialFocusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "focus.csv"
             path.write_text(
-                "id,priority,pattern,signal_types,focus,buyer_phrase\n"
-                "never,1,will-not-match,*,safe category,safe buyers\n",
+                "id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase\n"
+                "never,1,will-not-match,*,core,safe category,safe buyers\n",
                 encoding="utf-8",
             )
             table = CommercialFocusTable.load(path)
@@ -354,11 +354,22 @@ class CommercialFocusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "focus.csv"
             path.write_text(
-                "id,priority,pattern,signal_types,focus,buyer_phrase\n"
-                'bad,1,match,*,"tax, audit, advisory",buyers\n',
+                "id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase\n"
+                'bad,1,match,*,core,"tax, audit, advisory",buyers\n',
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(CommercialFocusError, "stacks multiple ideas"):
+                CommercialFocusTable.load(path)
+
+    def test_rejects_unknown_fit_tier(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "focus.csv"
+            path.write_text(
+                "id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase\n"
+                "bad,1,match,*,maybe,safe category,safe buyers\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(CommercialFocusError, "fit_tier"):
                 CommercialFocusTable.load(path)
 
     def test_longest_shared_phrase_is_consecutive(self) -> None:

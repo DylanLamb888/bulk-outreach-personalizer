@@ -6,6 +6,7 @@
 - Safe idempotent installer linking one tracked Skill source into both products
 - Python CLI with validation and production modes
 - Offer-agnostic campaign JSON validation
+- Breaking schema-v3 qualification contract with explicit migration errors for v2
 - Common CSV header mapping and row-order preservation
 - Unique-domain planning and duplicate-domain reuse
 - Parallel public website fetching
@@ -14,6 +15,10 @@
 - Private, loopback, link-local, and reserved network blocking
 - Deterministic extraction of up to three structured company facts with source evidence
 - Campaign-scoped regex mapping from raw website signals to one commercial category and buyer phrase
+- Core, secondary, and exclude fit tiers in each campaign focus table
+- Campaign-specific title and seniority qualification with mandatory title matching
+- Configurable provider email-status gates plus conservative syntax-only fallback
+- Deterministic duplicate-email winner selection
 - Safe secondary-fact selection when the highest-ranked website snippet is unusable
 - Conservative fallback compression for complete unmapped categories
 - Fail-closed rejection of slogans, testimonials, company-name leakage, sentence fragments, and incomplete clauses
@@ -25,6 +30,8 @@
 - Confidence scoring and fail-closed review/blank behavior
 - Complete personalized subject, pitch, and email rendering
 - Atomic CSV and checksummed manifest writing
+- Audit, ready-only, and manual-review CSV outputs
+- Immutable campaign and focus-rule snapshots for every run
 - Automated unit and integration tests
 - Clean-room non-M&A integration coverage for client-specific offers and mappings
 - Optional Firecrawl `/scrape` fallback for direct failures and weak page extraction
@@ -33,18 +40,19 @@
 - Conversational first-name cleanup and subject-safe company-name normalization
 - Deterministically balanced CTA assignment across each batch
 - Evidence-only focus matching with most-specific-rule selection across candidate facts
-- Website-anchored confidence bounds before a CSV fallback can override public evidence
+- Fail-closed first-party precedence: CSV evidence is considered only when the website is unavailable
 - Buyer-phrase and CTA concentration checks in batch QA
 
 ## Deliberate boundaries
 
 - Public websites plus company intelligence already supplied in the input CSV; no login, CAPTCHA bypass, LinkedIn scraping, or private data access
 - No per-row LLM calls or agent-written personalization
-- No email discovery or verification waterfall in this repository
+- No email discovery or verification waterfall; the engine only evaluates supplied statuses and syntax
 - No automatic campaign sending or Smartlead mutation
 - JavaScript-only websites may produce a weak or missing signal unless the optional Firecrawl fallback is configured
 - Self-hosted Firecrawl deployment, proxy rotation, and service hardening remain operator responsibilities
 - Client offer claims and copy still require human approval before production use
 - Market-specific categories are configuration, not engine behaviour; each campaign declares its own adjacent focus-rule CSV
+- CSV-only company evidence is review-only and requires two approved fields to agree on one rule
 
 The engine can later accept optional API-backed fetch adapters without changing the campaign or CSV output contract.

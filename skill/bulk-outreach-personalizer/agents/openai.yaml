@@ -1,6 +1,6 @@
 interface:
   display_name: "Bulk Outreach Personalizer"
-  short_description: "Create cached, import-ready outreach personalization"
+  short_description: "Qualify and personalize cached outreach lists"
   default_prompt: "Use $bulk-outreach-personalizer to validate and personalize this outreach CSV."
 
 policy:

@@ -1,8 +1,8 @@
 # Bulk Enrich
 
-Deterministic website enrichment and outreach-email personalization for large CSV lead lists. It makes no per-row LLM calls. An optional Firecrawl fallback can render difficult pages without changing the campaign or output contract.
+Deterministic website enrichment, qualification, and outreach-email personalization for large CSV lead lists. It makes no per-row LLM calls. An optional Firecrawl fallback can render difficult pages without changing the campaign or output contract.
 
-The engine fetches each unique public company domain once, caches the result, extracts auditable company facts, and selects the first fact that maps safely to buyer language. If website evidence fails, it can try campaign-configured company fields already present in the input CSV before routing the result through approved copy angles and writing a Smartlead/ListKit-ready CSV in the original row order.
+The engine fetches each unique public company domain once, caches the result, extracts auditable company facts, and applies campaign-specific company, contact, and email gates before rendering copy. A row is upload-ready only when all qualification and copy gates pass.
 
 ## What is included
 
@@ -16,17 +16,22 @@ The engine fetches each unique public company domain once, caches the result, ex
 - private/local-network blocking;
 - deterministic multi-fact HTML evidence extraction with safe secondary-fact fallback;
 - campaign-scoped website-signal to commercial-focus rules;
+- schema-v3 `core`, `secondary`, and `exclude` company-fit tiers;
+- campaign-specific title, seniority, and email-status qualification;
+- two-field corroboration for CSV-only company evidence;
+- deterministic duplicate-email resolution;
 - fail-closed rejection of slogans, testimonials, company-name fragments, incomplete clauses, service stacks, years, promotional adjectives, and “& more” language;
 - signal-routed subject and pitch templates;
 - campaign-approved CTA variants selected independently and deterministically;
 - even deterministic CTA distribution across each batch;
 - conversational greeting and subject-safe company-name cleanup;
-- confidence-bounded CSV fallbacks that cannot displace materially stronger website evidence;
+- review-only CSV fallbacks used only when first-party evidence is unavailable and two approved fields agree;
 - campaign-level banned phrases, word limits, and source-copy overlap limits;
 - batch repetition QA for openings, exact pitches, buyer phrases, and CTAs across unique domains;
 - editable title-to-hook rules;
-- confidence-based `ready`, `review`, `blank`, and `error` handling;
+- separate copy status and final `ready`, `review`, `excluded`, or `error` outreach status;
 - atomic CSV output and a checksummed run manifest;
+- immutable campaign and focus-rule snapshots beside every audit output;
 - no prospect data committed to Git.
 
 ## 1. Install the shared Skill
@@ -42,7 +47,7 @@ This creates symlinks under `~/.codex/skills/` and `~/.claude/skills/`. It is id
 
 ## 2. Create a campaign
 
-Copy `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`, rename both, and update `personalization.focus_rules_file` to the adjacent CSV filename. Replace the offer, approved claims, copy angles, CTA variants, quality thresholds, sender, and market-specific focus rules. Keep the campaign marked `test_only` until the copy has been reviewed.
+Copy `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`, rename both, and update `personalization.focus_rules_file` to the adjacent CSV filename. Replace the offer, qualification policy, copy angles, CTA variants, sender, and market-specific focus rules. Label every focus rule `core`, `secondary`, or `exclude`, and keep the campaign `test_only` until its rules and copy are reviewed.
 
 The Python engine contains no M&A, CFO, recruitment, or client-specific mapping. Those rules live only in the focus CSV declared by each campaign JSON. `--focus-rules` remains available as an explicit one-run override.
 
@@ -58,7 +63,7 @@ python scripts/enrich.py \
   --validate-only
 ```
 
-Validation reports the detected columns, missing values, unique domains, duplicate-domain savings, hook rules, and campaign approval state. It does not access websites or write output.
+Validation reports qualification columns, missing verification values, duplicate emails, unique domains, rule tiers, and campaign approval state. It does not access websites or write output.
 
 ## 4. Run a controlled test
 
@@ -81,11 +86,12 @@ python scripts/enrich.py \
   --input /absolute/path/leads.csv \
   --output outputs/campaign-name/enriched.csv \
   --ready-output outputs/campaign-name/smartlead-ready.csv \
+  --review-output outputs/campaign-name/manual-review.csv \
   --campaign campaigns/local/campaign-name.json \
   --concurrency 24
 ```
 
-The audit output preserves every original column and appends the personalized subject, pitch, selected CTA, full email, source and compressed focus, buyer phrase, mapping rule, routed angle, template, structured facts, evidence, confidence, quality flags, status, and errors. `--ready-output` creates a second CSV containing only rows marked `ready`. A manifest is written beside the audit CSV as `<output>.manifest.json`.
+The audit output preserves every original row and appends evidence, copy, gate decisions, and reasons. `--ready-output` contains only final `outreach_status=ready` rows; `--review-output` contains reviewable rows with rendered copy. Excluded rows remain auditable but their send copy is blank. The manifest and exact campaign/focus snapshots are written beside the audit CSV.
 
 The default cache lives under `var/cache/` for seven days. Re-running the same domains uses the extracted-signal cache and normally makes no HTTP requests. Use `--refresh-cache` only when fresh website evidence is required.
 
@@ -107,7 +113,7 @@ Firecrawl results have their own successful and negative local caches. The manif
 
 ## Quality gate
 
-Upload only rows marked `ready`. Inspect `review` rows before use. `blank` and `error` rows intentionally contain no send-ready personalization. For batches above the configured minimum size, repeated openings or exact pitches can automatically move affected rows to `review`.
+Upload only rows with `outreach_status=ready`. Inspect `review` rows before use. Excluded rows intentionally contain no send-ready personalization. For batches above the configured minimum size, repeated openings, exact pitches, or CTAs can move affected rows to review; buyer-phrase concentration can be disabled for a deliberately narrow segment.
 
 ```bash
 env PYTHONPATH=src python3 -B -m unittest discover -s tests -v

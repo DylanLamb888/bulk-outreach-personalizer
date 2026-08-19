@@ -64,13 +64,6 @@ class CampaignConfig:
         return float(self.data["personalization"]["min_confidence"])
 
     @property
-    def max_candidate_confidence_drop(self) -> float:
-        """Maximum evidence-confidence loss allowed when choosing a later fact."""
-        return float(
-            self.data["personalization"]["max_candidate_confidence_drop"]
-        )
-
-    @property
     def max_words(self) -> int:
         return int(self.data["personalization"]["max_words"])
 
@@ -157,6 +150,78 @@ class CampaignConfig:
             for item in configured["fields"]
         )
 
+    @property
+    def fallback_qualification_fields(self) -> tuple[str, ...]:
+        return tuple(
+            str(item) for item in self.data["qualification"]["company"]["fallback_fields"]
+        )
+
+    @property
+    def fallback_min_agreeing_fields(self) -> int:
+        return int(
+            self.data["qualification"]["company"]["fallback_min_agreeing_fields"]
+        )
+
+    @property
+    def ready_title_patterns(self) -> tuple[str, ...]:
+        return tuple(
+            str(item)
+            for item in self.data["qualification"]["contact"]["ready_title_patterns"]
+        )
+
+    @property
+    def review_title_patterns(self) -> tuple[str, ...]:
+        return tuple(
+            str(item)
+            for item in self.data["qualification"]["contact"]["review_title_patterns"]
+        )
+
+    @property
+    def excluded_title_patterns(self) -> tuple[str, ...]:
+        return tuple(
+            str(item)
+            for item in self.data["qualification"]["contact"]["exclude_title_patterns"]
+        )
+
+    @property
+    def ready_seniorities(self) -> tuple[str, ...]:
+        return tuple(
+            str(item)
+            for item in self.data["qualification"]["contact"]["ready_seniorities"]
+        )
+
+    @property
+    def review_seniorities(self) -> tuple[str, ...]:
+        return tuple(
+            str(item)
+            for item in self.data["qualification"]["contact"]["review_seniorities"]
+        )
+
+    @property
+    def accepted_email_statuses(self) -> tuple[str, ...]:
+        return tuple(
+            str(item)
+            for item in self.data["qualification"]["email"]["accepted_statuses"]
+        )
+
+    @property
+    def review_email_statuses(self) -> tuple[str, ...]:
+        return tuple(
+            str(item)
+            for item in self.data["qualification"]["email"]["review_statuses"]
+        )
+
+    @property
+    def rejected_email_statuses(self) -> tuple[str, ...]:
+        return tuple(
+            str(item)
+            for item in self.data["qualification"]["email"]["rejected_statuses"]
+        )
+
+    @property
+    def missing_email_status_action(self) -> str:
+        return str(self.data["qualification"]["email"]["missing_status_action"])
+
 
 def _require_mapping(parent: dict[str, Any], key: str) -> dict[str, Any]:
     value = parent.get(key)
@@ -209,8 +274,13 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
     if not isinstance(data, dict):
         raise CampaignConfigError("campaign configuration must be a JSON object")
 
-    if data.get("schema_version") != "2.0":
-        raise CampaignConfigError("'schema_version' must be '2.0'")
+    if data.get("schema_version") != "3.0":
+        if data.get("schema_version") == "2.0":
+            raise CampaignConfigError(
+                "campaign schema 2.0 is no longer supported; migrate it to schema 3.0 "
+                "and add qualification rules"
+            )
+        raise CampaignConfigError("'schema_version' must be '3.0'")
 
     campaign_id = _require_nonempty_string(data, "campaign_id")
     _validate_slug(campaign_id, "campaign_id")
@@ -277,18 +347,6 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         raise CampaignConfigError(
             "'personalization.min_confidence' must be from 0 to 1"
         )
-    max_candidate_confidence_drop = personalization.get(
-        "max_candidate_confidence_drop"
-    )
-    if (
-        not isinstance(max_candidate_confidence_drop, (int, float))
-        or isinstance(max_candidate_confidence_drop, bool)
-        or not 0 <= float(max_candidate_confidence_drop) <= 1
-    ):
-        raise CampaignConfigError(
-            "'personalization.max_candidate_confidence_drop' must be a number "
-            "from 0 to 1"
-        )
     banned_phrases = _require_string_list(
         personalization,
         "banned_phrases",
@@ -297,6 +355,7 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
     )
 
     row_fallback = personalization.get("row_fallback")
+    seen_headers: set[str] = set()
     if row_fallback is not None:
         if not isinstance(row_fallback, dict):
             raise CampaignConfigError(
@@ -312,7 +371,6 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
             raise CampaignConfigError(
                 "'personalization.row_fallback.fields' must be a non-empty array when enabled"
             )
-        seen_headers: set[str] = set()
         for index, item in enumerate(fields):
             label = f"personalization.row_fallback.fields[{index}]"
             if not isinstance(item, dict):
@@ -331,6 +389,102 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
                 raise CampaignConfigError(
                     f"'{label}.confidence' must be a number from 0 to 1"
                 )
+
+    qualification = _require_mapping(data, "qualification")
+    company_qualification = _require_mapping(qualification, "company")
+    fallback_min = company_qualification.get("fallback_min_agreeing_fields")
+    if not isinstance(fallback_min, int) or isinstance(fallback_min, bool) or not 2 <= fallback_min <= 10:
+        raise CampaignConfigError(
+            "'qualification.company.fallback_min_agreeing_fields' must be an integer from 2 to 10"
+        )
+    fallback_fields = _require_string_list(
+        company_qualification,
+        "fallback_fields",
+        allow_empty=True,
+        label="qualification.company.fallback_fields",
+    )
+    unknown_fallback_fields = [
+        item for item in fallback_fields if item.casefold() not in seen_headers
+    ]
+    if unknown_fallback_fields:
+        raise CampaignConfigError(
+            "qualification company fallback fields must also appear in "
+            "personalization.row_fallback.fields: "
+            + ", ".join(unknown_fallback_fields)
+        )
+
+    contact_qualification = _require_mapping(qualification, "contact")
+    for key, allow_empty in (
+        ("ready_title_patterns", False),
+        ("review_title_patterns", True),
+        ("exclude_title_patterns", True),
+    ):
+        patterns = _require_string_list(
+            contact_qualification,
+            key,
+            allow_empty=allow_empty,
+            label=f"qualification.contact.{key}",
+        )
+        for index, pattern in enumerate(patterns):
+            try:
+                re.compile(pattern, re.I)
+            except re.error as exc:
+                raise CampaignConfigError(
+                    f"invalid qualification contact pattern at {key}[{index}]: {exc}"
+                ) from exc
+    ready_seniorities = _require_string_list(
+        contact_qualification,
+        "ready_seniorities",
+        label="qualification.contact.ready_seniorities",
+    )
+    review_seniorities = _require_string_list(
+        contact_qualification,
+        "review_seniorities",
+        allow_empty=True,
+        label="qualification.contact.review_seniorities",
+    )
+    if {item.casefold() for item in ready_seniorities} & {
+        item.casefold() for item in review_seniorities
+    }:
+        raise CampaignConfigError(
+            "qualification ready and review seniorities must not overlap"
+        )
+
+    email_qualification = _require_mapping(qualification, "email")
+    email_status_groups: list[tuple[str, list[str]]] = []
+    for key, allow_empty in (
+        ("accepted_statuses", False),
+        ("review_statuses", True),
+        ("rejected_statuses", False),
+    ):
+        email_status_groups.append(
+            (
+                key,
+                _require_string_list(
+                    email_qualification,
+                    key,
+                    allow_empty=allow_empty,
+                    label=f"qualification.email.{key}",
+                ),
+            )
+        )
+    seen_statuses: dict[str, str] = {}
+    for key, statuses in email_status_groups:
+        for status_value in statuses:
+            identity = re.sub(r"[^a-z0-9]+", " ", status_value.casefold()).strip()
+            if identity in seen_statuses:
+                raise CampaignConfigError(
+                    f"email status '{status_value}' appears in both {seen_statuses[identity]} and {key}"
+                )
+            seen_statuses[identity] = key
+    if email_qualification.get("missing_status_action") not in {
+        "syntax",
+        "review",
+        "exclude",
+    }:
+        raise CampaignConfigError(
+            "'qualification.email.missing_status_action' must be syntax, review, or exclude"
+        )
 
     angles = personalization.get("angles")
     if not isinstance(angles, list) or not angles:
@@ -422,7 +576,6 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
     for key in (
         "max_opening_share",
         "max_exact_pitch_share",
-        "max_buyer_phrase_share",
         "max_cta_share",
     ):
         value = quality.get(key)
@@ -432,6 +585,15 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
             or not 0 < float(value) <= 1
         ):
             raise CampaignConfigError(f"'quality.{key}' must be greater than 0 and at most 1")
+    buyer_phrase_share = quality.get("max_buyer_phrase_share")
+    if buyer_phrase_share is not None and (
+        not isinstance(buyer_phrase_share, (int, float))
+        or isinstance(buyer_phrase_share, bool)
+        or not 0 < float(buyer_phrase_share) <= 1
+    ):
+        raise CampaignConfigError(
+            "'quality.max_buyer_phrase_share' must be null or greater than 0 and at most 1"
+        )
     if quality.get("repetition_action") not in {"warn", "review"}:
         raise CampaignConfigError(
             "'quality.repetition_action' must be 'warn' or 'review'"
@@ -482,6 +644,20 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         "personalization_quality_flags",
         "personalization_status",
         "personalization_error",
+        "company_fit_status",
+        "company_fit_tier",
+        "company_fit_rule",
+        "company_fit_source",
+        "company_fit_evidence",
+        "company_fit_reason",
+        "contact_fit_status",
+        "contact_fit_rule",
+        "contact_fit_reason",
+        "email_fit_status",
+        "email_fit_rule",
+        "email_fit_reason",
+        "outreach_status",
+        "outreach_reason",
     }
     missing_output_fields = required_output_fields.difference(fields)
     if missing_output_fields:

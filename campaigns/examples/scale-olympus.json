@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0",
+  "schema_version": "3.0",
   "campaign_id": "scale-olympus-test",
   "status": "test_only",
   "client_name": "Scale Olympus",
@@ -45,13 +45,37 @@
       "Do not invent call volumes, client results, guarantees, named customers, or prospect intent."
     ]
   },
+  "qualification": {
+    "company": {
+      "fallback_min_agreeing_fields": 2,
+      "fallback_fields": ["Company description", "Company keywords", "Company industry"]
+    },
+    "contact": {
+      "ready_title_patterns": [
+        "\\b(?:owner|co-owner|founder|co-founder|chief executive officer|ceo|president|managing partner|managing director|partner|principal|managing member)\\b"
+      ],
+      "review_title_patterns": [
+        "\\b(?:vice president|vp|director|head of|business development|sales director|commercial director)\\b"
+      ],
+      "exclude_title_patterns": [
+        "\\b(?:assistant|associate|analyst|intern|student|coordinator|co-ordinator|specialist)\\b"
+      ],
+      "ready_seniorities": ["C-Suite", "Founder/Owner", "Partner", "Director"],
+      "review_seniorities": ["Vice President", "Head"]
+    },
+    "email": {
+      "accepted_statuses": ["verified", "valid"],
+      "review_statuses": ["catch-all", "risky", "unknown", "unverified"],
+      "rejected_statuses": ["invalid", "bounced", "do not email"],
+      "missing_status_action": "syntax"
+    }
+  },
   "personalization": {
     "objective": "Use a verified product, service, audience, or specialism to frame a concrete outbound angle.",
     "output_field": "personalized_pitch",
     "focus_rules_file": "scale-olympus-focus.csv",
     "max_words": 14,
     "min_confidence": 0.72,
-    "max_candidate_confidence_drop": 0.10,
     "low_confidence_action": "review",
     "banned_phrases": [
       "saw that",
@@ -142,7 +166,7 @@
     "opening_words": 4,
     "max_opening_share": 0.45,
     "max_exact_pitch_share": 0.1,
-    "max_buyer_phrase_share": 0.25,
+    "max_buyer_phrase_share": null,
     "max_cta_share": 0.22,
     "min_rows": 20,
     "repetition_action": "review"
@@ -167,7 +191,21 @@
       "personalization_confidence",
       "personalization_quality_flags",
       "personalization_status",
-      "personalization_error"
+      "personalization_error",
+      "company_fit_status",
+      "company_fit_tier",
+      "company_fit_rule",
+      "company_fit_source",
+      "company_fit_evidence",
+      "company_fit_reason",
+      "contact_fit_status",
+      "contact_fit_rule",
+      "contact_fit_reason",
+      "email_fit_status",
+      "email_fit_rule",
+      "email_fit_reason",
+      "outreach_status",
+      "outreach_reason"
     ]
   },
   "notes": "Test configuration only. Approve the final campaign copy before sending."

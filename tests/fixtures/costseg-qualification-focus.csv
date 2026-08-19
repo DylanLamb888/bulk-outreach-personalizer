@@ -1,0 +1,5 @@
+id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase
+costseg-core,5,\bcost segregation(?: studies)?\b,*,core,cost segregation studies,real estate owners considering cost segregation
+energy-secondary,20,\benergy tax incentives?\b,*,secondary,energy tax incentives,property owners seeking energy tax incentives
+property-tax-exclude,30,\bproperty tax appeals?\b,*,exclude,property tax appeals,property owners appealing assessments
+accounting-exclude,40,\baccounting and tax services\b,*,exclude,accounting and tax services,business owners needing accounting support

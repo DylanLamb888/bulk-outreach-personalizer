@@ -16,7 +16,10 @@ HEADER_ALIASES: dict[str, tuple[str, ...]] = {
     "first_name": ("first_name", "first name", "firstname"),
     "last_name": ("last_name", "last name", "lastname"),
     "email": ("email", "email_address", "email address", "work_email"),
+    "email_status": ("email_status", "email status", "email verification status"),
     "job_title": ("job_title", "job title", "title"),
+    "job_seniority": ("job_seniority", "job seniority", "seniority"),
+    "job_department": ("job_department", "job department", "department"),
     "company_name": ("company_name", "company name", "organization", "organisation"),
     "company_domain": ("company_domain", "company domain", "domain"),
     "company_website": ("company_website", "company website", "website", "company url"),
@@ -72,6 +75,10 @@ class CSVSummary:
     domains_present: int
     unique_domain_count: int
     duplicate_domain_rows: int
+    unique_email_count: int
+    duplicate_email_rows: int
+    email_status_present: bool
+    missing_email_status_values: int
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -122,6 +129,13 @@ def inspect_csv(path: str | Path) -> CSVSummary:
     }
     domains = [domain_for_row(row, mapping) for row in rows]
     present_domains = [domain for domain in domains if domain]
+    email_header = mapping["email"]
+    emails = [
+        row.get(email_header, "").strip().casefold()
+        for row in rows
+        if row.get(email_header, "").strip()
+    ]
+    email_status_header = mapping.get("email_status", "")
 
     return CSVSummary(
         path=str(data.path),
@@ -132,6 +146,14 @@ def inspect_csv(path: str | Path) -> CSVSummary:
         domains_present=len(present_domains),
         unique_domain_count=len(set(present_domains)),
         duplicate_domain_rows=len(present_domains) - len(set(present_domains)),
+        unique_email_count=len(set(emails)),
+        duplicate_email_rows=len(emails) - len(set(emails)),
+        email_status_present=bool(email_status_header),
+        missing_email_status_values=(
+            sum(not row.get(email_status_header, "").strip() for row in rows)
+            if email_status_header
+            else len(rows)
+        ),
     )
 
 

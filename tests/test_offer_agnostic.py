@@ -33,8 +33,8 @@ class OfferAgnosticTests(unittest.TestCase):
             root = Path(tmp)
             focus_path = root / "bookkeeping-focus.csv"
             focus_path.write_text(
-                "id,priority,pattern,signal_types,focus,buyer_phrase\n"
-                "property-bookkeeping,10,commercial property management,*,"
+                "id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase\n"
+                "property-bookkeeping,10,commercial property management,*,core,"
                 "property-management bookkeeping,property managers needing bookkeeping\n",
                 encoding="utf-8",
             )
@@ -90,9 +90,10 @@ class OfferAgnosticTests(unittest.TestCase):
             input_path = root / "leads.csv"
             input_path.write_text(
                 "Email,First name,Last name,Job title,Company name,Website,"
-                "Company description\n"
+                "Company description,Company keywords\n"
                 "sam@example.com,Sam,Lee,Founder,Property Ledger,property.example,"
-                '"Commercial property management services for regional owners"\n',
+                '"Commercial property management services for regional owners",'
+                '"commercial property management"\n',
                 encoding="utf-8",
             )
             output_path = root / "enriched.csv"
@@ -110,6 +111,7 @@ class OfferAgnosticTests(unittest.TestCase):
             with output_path.open(encoding="utf-8-sig", newline="") as handle:
                 row = next(csv.DictReader(handle))
             self.assertEqual(row["personalization_status"], "ready")
+            self.assertEqual(row["outreach_status"], "review")
             self.assertEqual(row["personalization_focus_rule"], "property-bookkeeping")
             self.assertEqual(
                 row["personalization_source"], "input:Company description"
