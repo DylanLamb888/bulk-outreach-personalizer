@@ -23,6 +23,10 @@ _BLOCKED_PHRASES = (
     "access denied",
     "contact us today",
     "learn more",
+    "cookies help us",
+    "through this program, cbp works with the trade community",
+    "apply to the program and work with cbp",
+    "application process is easy and it is done online",
 )
 _PROMOTIONAL_PHRASES = (
     "world-leading",
@@ -45,6 +49,19 @@ _METRIC_CLAIM_RE = re.compile(
     r"\b(?:million|billion)\b)",
     re.IGNORECASE,
 )
+_INCOMPLETE_FINAL_TOKENS = {
+    "advis",
+    "commer",
+    "comp",
+    "financ",
+    "int",
+    "intern",
+    "internat",
+    "manag",
+    "servic",
+    "solut",
+    "transact",
+}
 
 
 def clean_text(value: str) -> str:
@@ -183,7 +200,12 @@ def _acceptable(value: str, *, kind: str) -> bool:
         return False
     if re.search(r"https?://|www\.|\S+@\S+", value, re.IGNORECASE):
         return False
-    if re.match(r"^(?:visit|click|shop|browse|contact)\b", lowered):
+    if re.match(r"^(?:visit|click|shop|browse|contact|download)\b", lowered):
+        return False
+    if re.match(r"^\(?see\b", lowered):
+        return False
+    final_token = re.sub(r"[^a-z]", "", words[-1].casefold())
+    if final_token in _INCOMPLETE_FINAL_TOKENS:
         return False
     return True
 

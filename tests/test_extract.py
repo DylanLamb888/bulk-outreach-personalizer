@@ -42,6 +42,26 @@ class ExtractTests(unittest.TestCase):
         self.assertNotIn("Privacy", all_text)
         self.assertNotIn("All rights reserved", all_text)
 
+    def test_rejects_reference_cookie_and_truncated_candidates(self) -> None:
+        page = parse_html(
+            """
+            <html><body>
+              <p>(see Entry Type 86 page for more info)</p>
+              <p>Cookies help us improve your experience and analyze traffic</p>
+              <p>Through this program, CBP works with the trade community to strengthen international supply chains</p>
+              <p>Companies can apply to the program and work with CBP because the application process is easy and it is done online</p>
+              <p>We help bring clarity to the complexity of int</p>
+              <p>Download our USMCA certification guide in PDF format</p>
+              <p>We provide full-service customs brokerage across the United States</p>
+            </body></html>
+            """
+        )
+        candidates = page_candidates(page, "https://broker.example/services")
+        self.assertEqual(
+            [candidate.text for candidate in candidates],
+            ["We provide full-service customs brokerage across the United States"],
+        )
+
     def test_normalizes_real_world_business_descriptions_without_cutting_clauses(self) -> None:
         examples = {
             "World-class restoration, repair, refinishing, and sale of pianos since 1920":

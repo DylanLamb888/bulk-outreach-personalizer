@@ -339,7 +339,10 @@ def _select_company_candidate(
         and item[3].rule_id != "generic-compression"
     ]
     if website_mapped:
-        return min(website_mapped, key=lambda item: (item[0], item[1])), ()
+        return min(
+            website_mapped,
+            key=lambda item: (item[0], -item[2].confidence, item[1]),
+        ), ()
 
     website_any = [
         item for item in candidates if not item[2].source_url.startswith("input:")
@@ -347,7 +350,10 @@ def _select_company_candidate(
     if website_any:
         # A readable first-party site with no campaign match is negative evidence.
         # CSV enrichment may only rescue an unavailable site, never an unclear one.
-        return min(website_any, key=lambda item: (item[0], item[1])), ()
+        return min(
+            website_any,
+            key=lambda item: (item[0], -item[2].confidence, item[1]),
+        ), ()
 
     approved_headers = {
         item.casefold() for item in campaign.fallback_qualification_fields

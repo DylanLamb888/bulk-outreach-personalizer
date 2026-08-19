@@ -1,4 +1,5 @@
 id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase
 customs-core,10,\bcustoms (?:clearance|brokerage)\b,*,core,customs clearance,importers needing customs clearance
+trade-compliance-core,15,\bcompliant trade (?:activities|operations)\b,*,core,trade compliance,importers needing trade-compliance support
 freight-secondary,20,\bfreight forwarding\b,*,secondary,international freight,companies moving international freight
 agency-exclude,30,\bmarketing agency\b,*,exclude,marketing services,companies seeking marketing support

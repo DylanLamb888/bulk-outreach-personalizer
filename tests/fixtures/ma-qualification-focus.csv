@@ -1,4 +1,5 @@
 id,priority,pattern,signal_types,fit_tier,focus,buyer_phrase
 ma-core,10,\bsell[- ]side M&A\b,*,core,sell-side M&A,owners considering a business sale
+investment-bank-secondary,15,\bboutique investment bank\b,*,secondary,investment banking,companies considering financing or a transaction
 valuation-secondary,20,\bbusiness valuations?\b,*,secondary,business valuation,business owners needing a valuation
 washing-exclude,30,\bcommercial washing\b,*,exclude,commercial washing,farms needing washing services

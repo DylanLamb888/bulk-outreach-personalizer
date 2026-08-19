@@ -258,6 +258,21 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(selected[2].source_url, "https://example.com/")
         self.assertEqual(fields, ())
 
+        stronger_website = candidate(
+            priority=48,
+            index=3,
+            source_url="https://example.com/services",
+            confidence=0.94,
+            rule_id="ma-advisory",
+        )
+        selected, fields = _select_company_candidate(
+            [website, stronger_website, csv_description, csv_keywords],
+            campaign,
+        )
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected[2].source_url, "https://example.com/services")
+        self.assertEqual(fields, ())
+
         unmatched_website = candidate(
             priority=1000,
             index=0,

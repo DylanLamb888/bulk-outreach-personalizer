@@ -26,7 +26,7 @@ capital-raising,42,"\bcapital rais(?:e|ing)\b|\bdebt (?:and|&) equity financing\
 business-valuation,43,"\bbusiness valuations?\b|\bvaluation services?\b|\bmarket-based valuations?\b|\bopinions? of value\b",*,secondary,business valuation,business owners needing a valuation
 automotive-dealership-brokerage,45,"\bautomotive dealership broker\b|\bdealership owners? considering a sale\b|\bvaluations? for auto groups?\b",*,core,automotive dealership brokerage,dealership owners considering a sale
 business-brokerage,46,"\bbusiness brokers?\b|\bsold (?:our|a|the) .{0,40}\bbusiness\b|\bwhy use a broker\b|\bowners? considering a (?:business )?sale\b|\bbusiness brokerage\b",*,core,business brokerage,owners considering a business sale
-investment-banking,47,"\binvestment bank(?:ing)?\b|\bcorporate finance\b|\bstrategic financial advisory\b",*,core,corporate finance advisory,companies considering financing or a transaction
+investment-banking,47,"\binvestment bank(?:ing)?\b|\bcorporate finance\b|\bstrategic financial advisory\b",*,secondary,corporate finance advisory,companies considering financing or a transaction
 ma-advisory,48,"\bM&A\b|\bmergers? (?:and|&) acquisitions?\b|\bprivate capital market\b",*,core,M&A advisory,business owners considering a transaction
 business-growth,60,"\bcompanies? (?:connect|collaborate).{0,50}\bgrow\b|\bcompanies?.{0,50}\bgrow with confidence\b",*,exclude,business growth,companies looking to grow
 owner-financial-guidance,70,"\bowners? make clearer financial decisions\b",*,exclude,financial guidance,business owners seeking financial guidance

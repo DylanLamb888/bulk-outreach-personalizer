@@ -19,7 +19,7 @@ from bulk_enrich.fetcher import HttpFetcher
 from bulk_enrich.models import CompanyFact, FetchResult, SiteSignal
 
 
-SIGNAL_ENGINE_VERSION = "6"
+SIGNAL_ENGINE_VERSION = "7"
 
 
 _GENERIC_BRAND_SUFFIXES = (
