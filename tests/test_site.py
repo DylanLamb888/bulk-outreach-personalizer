@@ -1,0 +1,97 @@
+import tempfile
+import unittest
+from datetime import UTC, datetime
+from pathlib import Path
+
+from bulk_enrich.cache import JsonCache
+from bulk_enrich.models import FetchResult
+from bulk_enrich.site import SiteEnricher
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class FakeFetcher:
+    def __init__(self, body: str, *, succeeds: bool = True, provider: str = "http") -> None:
+        self.body = body
+        self.succeeds = succeeds
+        self.provider = provider
+        self.calls: list[str] = []
+
+    def fetch(self, url: str) -> FetchResult:
+        self.calls.append(url)
+        return FetchResult(
+            url=url,
+            final_url=url,
+            status_code=200 if self.succeeds else 0,
+            content_type="text/html",
+            body=self.body if self.succeeds else "",
+            fetched_at=datetime.now(UTC).isoformat(),
+            error="" if self.succeeds else "HTTP 403",
+            provider=self.provider,
+        )
+
+
+class SiteEnricherTests(unittest.TestCase):
+    def test_extracts_once_then_uses_signal_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fetcher = FakeFetcher((ROOT / "tests" / "fixtures" / "site.html").read_text())
+            enricher = SiteEnricher(
+                fetcher,  # type: ignore[arg-type]
+                JsonCache(Path(tmp)),
+                max_pages=1,
+            )
+            first = enricher.enrich("northstar.example")
+            second = enricher.enrich("northstar.example")
+            self.assertEqual(first.status, "ok")
+            self.assertGreaterEqual(first.confidence, 0.90)
+            self.assertFalse(first.signal_cache_hit)
+            self.assertEqual(first.signal_type, "audience")
+            self.assertIn("helping owner-led businesses", first.focus)
+            self.assertGreaterEqual(len(first.facts), 1)
+            self.assertEqual(first.facts[0].evidence, first.evidence)
+            self.assertTrue(second.signal_cache_hit)
+            self.assertEqual(second.pages_fetched, 0)
+            self.assertEqual(len(fetcher.calls), 1)
+
+    def test_uses_firecrawl_after_direct_homepage_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            direct = FakeFetcher("", succeeds=False)
+            firecrawl = FakeFetcher(
+                (ROOT / "tests" / "fixtures" / "site.html").read_text(),
+                provider="firecrawl",
+            )
+            enricher = SiteEnricher(
+                direct,  # type: ignore[arg-type]
+                JsonCache(Path(tmp)),
+                max_pages=1,
+                fallback_fetcher=firecrawl,
+            )
+            signal = enricher.enrich("northstar.example")
+
+            self.assertEqual(signal.status, "ok")
+            self.assertEqual(len(direct.calls), 3)
+            self.assertEqual(firecrawl.calls, ["https://northstar.example/"])
+
+    def test_prefers_firecrawl_when_direct_html_has_no_usable_signal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            direct = FakeFetcher("<html><body><p>Welcome</p></body></html>")
+            firecrawl = FakeFetcher(
+                (ROOT / "tests" / "fixtures" / "site.html").read_text(),
+                provider="firecrawl",
+            )
+            enricher = SiteEnricher(
+                direct,  # type: ignore[arg-type]
+                JsonCache(Path(tmp)),
+                max_pages=1,
+                fallback_fetcher=firecrawl,
+            )
+            signal = enricher.enrich("northstar.example")
+
+            self.assertEqual(signal.status, "ok")
+            self.assertEqual(len(direct.calls), 1)
+            self.assertEqual(firecrawl.calls, ["https://northstar.example/"])
+
+
+if __name__ == "__main__":
+    unittest.main()

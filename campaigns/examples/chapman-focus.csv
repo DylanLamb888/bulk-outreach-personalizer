@@ -1,0 +1,15 @@
+id,priority,pattern,signal_types,focus,buyer_phrase
+piano-restoration,10,"\bpiano(?:s)?\b.*\b(?:restoration|repair|refinishing)\b|\b(?:restoration|repair|refinishing)\b.*\bpiano(?:s)?\b",*,piano restoration,piano owners needing restoration
+architectural-salvage,20,"\b(?:architectural salvage|reclaimed fireplace mantels|stained glass windows)\b",*,architectural salvage,architectural salvage buyers
+fundraising-products,30,"\b(?:fundraising|fundraisers|confectionery candy)\b",*,fundraising products,organisations planning fundraisers
+premium-tequila,40,"\btequila\b",*,premium tequila,retailers and distributors sourcing tequila
+outdoor-renovations,50,"\bdecks?\b|\bpergolas?\b|\bscreened porches?\b|\bsunrooms?\b",*,outdoor living projects,homeowners planning outdoor renovations
+specialty-chemicals,60,"\bconcrete sealers?\b|\bwater softening\b|\bpool salts?\b|\bdeicers?\b",*,specialty chemical products,distributors sourcing specialty chemical products
+event-rentals,70,"\bevent rentals?\b|\brentals? for special events?\b|\bparty rentals?\b",*,event rentals,event planners sourcing rental equipment
+property-restoration,80,"\bwater damage\b|\bfire repair\b|\bmold removal\b|\bproperty mitigation\b",*,property restoration,property owners needing restoration
+laboratory-equipment,90,"\bovens? and incubators?\b|\blaboratory ovens?\b|\blab incubators?\b",*,laboratory ovens and incubators,laboratories sourcing ovens or incubators
+kitchen-bath-remodeling,100,"\bkitchen and (?:bath|bathroom) remodeling\b|\bkitchen (?:&|and) bath\b",*,kitchen and bathroom remodeling,homeowners planning a remodel
+commercial-construction,110,"\bgeneral contractor\b|\bcommercial construction\b",*,commercial construction,companies planning construction projects
+custom-cnc-parts,120,"\bCNC (?:machined )?parts?\b|\bcustom milled CNC\b|\bscrew machine .{0,20}\bparts?\b",*,custom CNC parts,manufacturers sourcing custom CNC parts
+commercial-printing,130,"\bprinting company\b|\bcommercial printing\b|\bcatalogs?.{0,30}\bdirect mail\b",*,commercial printing,companies needing print or direct mail
+commercial-security,140,"\bsecurity systems?\b|\bfire alarms?\b|\bcard access\b|\baccess control\b",*,commercial security systems,businesses upgrading security or access control

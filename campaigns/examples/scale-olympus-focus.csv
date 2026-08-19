@@ -1,0 +1,40 @@
+id,priority,pattern,signal_types,focus,buyer_phrase
+piano-restoration,10,"\bpiano(?:s)?\b.*\b(?:restoration|repair|refinishing)\b|\b(?:restoration|repair|refinishing)\b.*\bpiano(?:s)?\b",*,piano restoration,piano owners needing restoration
+architectural-salvage,20,"\b(?:architectural salvage|reclaimed fireplace mantels|stained glass windows)\b",*,architectural salvage,architectural salvage buyers
+fundraising-products,30,"\b(?:fundraising|fundraisers|confectionery candy)\b",*,fundraising products,organisations planning fundraisers
+flexible-capital,35,"\bflexible capital(?: solutions)?\b",*,flexible capital solutions,companies looking for flexible capital solutions
+ma-buy-or-sell,40,"\bbuy(?:ing)?\s+or\s+sell(?:ing)?\b|\b(?:buyers?|acquirers?)\s+and\s+sellers?\b|\bbuy-side\b.{0,40}\bsell-side\b|\bsell-side\b.{0,40}\bbuy-side\b",*,M&A advisory,people thinking about buying or selling a business
+business-valuation,41,"\bbusiness valuations?\b|\bvaluation services?\b|\bmarket-based valuations?\b|\bopinions? of value\b",*,business valuation,business owners needing a valuation
+ma-sell-side,42,"\bsell[- ]side\b|\bselling .{0,30}\b(?:businesses|companies)\b|\b(?:sell|selling) (?:a|your|their) business\b|\bbusinesses for sale\b|\bbusiness sales?\b",*,sell-side M&A,owners considering a business sale
+ma-buy-side,43,"\bbuy[- ]side\b|\bacquisition origination\b|\bstrategic acquirers?\b|\bidentify and complete strategic investments or acquisitions\b",*,buy-side M&A,acquirers looking for suitable businesses
+capital-raising,44,"\bcapital rais(?:e|ing)\b|\bdebt (?:and|&) equity financing\b|\bequity financing\b|\bcapital structuring\b",*,capital raising,companies looking to raise capital
+automotive-dealership-brokerage,45,"\bautomotive dealership broker\b|\bdealership owners? considering a sale\b|\bvaluations? for auto groups?\b",*,automotive dealership brokerage,dealership owners considering a sale
+business-brokerage,46,"\bbusiness brokers?\b|\bsold (?:our|a|the) .{0,40}\bbusiness\b|\bwhy use a broker\b|\bowners? considering a (?:business )?sale\b|\bbusiness brokerage\b",*,business brokerage,owners considering a business sale
+investment-banking,47,"\binvestment bank(?:ing)?\b|\bcorporate finance\b|\bstrategic financial advisory\b",*,corporate finance advisory,companies considering financing or a transaction
+ma-advisory,48,"\bM&A\b|\bmergers? (?:and|&) acquisitions?\b|\bprivate capital market\b",*,M&A advisory,business owners considering a transaction
+business-growth,60,"\bcompanies? (?:connect|collaborate).{0,50}\bgrow\b|\bcompanies?.{0,50}\bgrow with confidence\b",*,business growth,companies looking to grow
+owner-financial-guidance,70,"\bowners? make clearer financial decisions\b",*,financial guidance,business owners seeking financial guidance
+premium-tequila,90,"\btequila\b",*,premium tequila,retailers and distributors sourcing tequila
+private-market-funds,100,"\bprivate equity funds?\b|\bco-investments?\b|\bsmall-cap buyout\b|\bsecondaries\b",*,private market investments,investors seeking private market exposure
+venture-private-equity,110,"\bventure capital and private equity\b|\bprivate equity firm\b|\bgrowth capital investments?\b",*,private equity investment,companies seeking an investment partner
+outdoor-renovations,120,"\bdecks?\b|\bpergolas?\b|\bscreened porches?\b|\bsunrooms?\b",*,outdoor living projects,homeowners planning outdoor renovations
+middle-market-financing,130,"\bfinancing (?:for|partner).{0,50}\b(?:lower )?middle market\b|\blower middle market.{0,50}\bfinancing\b",*,lower-middle-market financing,companies seeking flexible financing
+exit-planning-software,140,"\bguide business owners?.{0,50}\bexits?\b|\bbusiness exit planning software\b",*,exit planning software,advisers supporting business owner exits
+specialty-chemicals,150,"\bconcrete sealers?\b|\bwater softening\b|\bpool salts?\b|\bdeicers?\b",*,specialty chemical products,distributors sourcing specialty chemical products
+event-rentals,160,"\bevent rentals?\b|\brentals? for special events?\b|\bparty rentals?\b",*,event rentals,event planners sourcing rental equipment
+property-restoration,170,"\bwater damage\b|\bfire repair\b|\bmold removal\b|\bproperty mitigation\b",*,property restoration,property owners needing restoration
+laboratory-equipment,190,"\bovens? and incubators?\b|\blaboratory ovens?\b|\blab incubators?\b",*,laboratory ovens and incubators,laboratories sourcing ovens or incubators
+kitchen-bath-remodeling,200,"\bkitchen and (?:bath|bathroom) remodeling\b|\bkitchen (?:&|and) bath\b",*,kitchen and bathroom remodeling,homeowners planning a remodel
+shower-doors,210,"\bglass shower doors?\b|\bcustom shower doors?\b",*,custom shower doors,homeowners planning bathroom renovations
+flooring-remodeling,220,"\bflooring store\b|\bcommercial flooring\b|\bflooring and remodeling\b",*,flooring and remodeling,property owners planning renovations
+commercial-construction,230,"\bgeneral contractor\b|\bcommercial construction\b",*,commercial construction,companies planning construction projects
+precision-cutting-tools,250,"\bprecision cutting tools?\b|\bprecision machining and measuring tools?\b",*,precision cutting tools,manufacturers sourcing precision cutting tools
+custom-cnc-parts,260,"\bCNC (?:machined )?parts?\b|\bcustom milled CNC\b|\bscrew machine .{0,20}\bparts?\b",*,custom CNC parts,manufacturers sourcing custom CNC parts
+plant-based-distribution,270,"\bvegetarian products?\b|\bplant-based food wholesaler\b",*,plant-based food distribution,retailers sourcing plant-based products
+commercial-printing,280,"\bprinting company\b|\bcommercial printing\b|\bcatalogs?.{0,30}\bdirect mail\b",*,commercial printing,companies needing print or direct mail
+commercial-security,290,"\bsecurity systems?\b|\bfire alarms?\b|\bcard access\b|\baccess control\b",*,commercial security systems,businesses upgrading security or access control
+witch-hazel-skincare,300,"\bwitch hazel\b|\bskincare.{0,30}\bfirst aid\b",*,witch hazel skincare,retailers sourcing personal care products
+early-stage-investing,310,"\bearly[- ]stage investing\b|\bearly[- ]stage investment\b",*,early-stage investment,founders raising an early-stage round
+commercial-washing,320,"\b(?:mobile|hot water|pressure) washing\b|\bwashing and disinfecting\b",*,commercial washing and disinfection,farms needing washing and disinfection
+wealth-exit-planning,330,"\bwealth management\b|\bfinancial (?:and|&) retirement planning\b|\bwealth creation and preservation\b",*,wealth and exit planning,business owners needing wealth or exit planning
+exit-planning-advisory,340,"\bbusiness owner planning\b|\bbusiness exit planning\b|\bexit planning services?\b",*,business and exit planning,owners planning growth or succession

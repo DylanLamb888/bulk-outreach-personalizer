@@ -1,0 +1,85 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from bulk_enrich.config import CampaignConfigError, load_campaign
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class CampaignConfigTests(unittest.TestCase):
+    def test_campaign_template_is_valid(self) -> None:
+        config = load_campaign(ROOT / "campaigns" / "campaign-template.json")
+        self.assertEqual(config.campaign_id, "replace-me")
+        self.assertEqual(
+            config.focus_rules_path,
+            (ROOT / "campaigns" / "campaign-template-focus.csv").resolve(),
+        )
+
+    def test_example_campaigns_are_valid(self) -> None:
+        for path in sorted((ROOT / "campaigns" / "examples").glob("*.json")):
+            with self.subTest(path=path.name):
+                config = load_campaign(path)
+                self.assertEqual(config.status, "test_only")
+
+    def test_missing_output_merge_field_is_rejected(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["email"]["body"] = "Hi {{first_name}}"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaises(CampaignConfigError):
+                load_campaign(path)
+
+    def test_banned_phrase_in_copy_is_rejected(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["personalization"]["angles"][0]["templates"][0]["pitch"] = (
+            "Saw that {{company_focus}}. Could the approved offer help?"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "banned phrase"):
+                load_campaign(path)
+
+    def test_missing_fallback_angle_is_rejected(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["personalization"]["angles"][0]["signal_types"] = ["service"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "fallback"):
+                load_campaign(path)
+
+    def test_duplicate_cta_variant_id_is_rejected(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["offer"]["cta_variants"][1]["id"] = payload["offer"]["cta_variants"][0]["id"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "duplicate CTA"):
+                load_campaign(path)
+
+    def test_focus_rules_file_is_required(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        del payload["personalization"]["focus_rules_file"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "focus_rules_file"):
+                load_campaign(path)
+
+    def test_row_fallback_field_confidence_is_validated(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["personalization"]["row_fallback"]["fields"][0]["confidence"] = 1.5
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "confidence"):
+                load_campaign(path)
+
+
+if __name__ == "__main__":
+    unittest.main()

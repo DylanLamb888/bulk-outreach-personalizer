@@ -1,0 +1,122 @@
+{
+  "schema_version": "2.0",
+  "campaign_id": "replace-me",
+  "status": "test_only",
+  "client_name": "Replace with client name",
+  "sender": {
+    "name": "Replace with sender name"
+  },
+  "offer": {
+    "service": "Describe the approved service in one sentence.",
+    "audience": "Describe the intended buyer.",
+    "risk_reversal": "Add the approved risk reversal or leave blank.",
+    "cta": "Offer one specific asset or useful next step.",
+    "cta_variants": [
+      {
+        "id": "send-first-idea",
+        "text": "Want me to send over the first idea I'd test?"
+      },
+      {
+        "id": "send-short-outline",
+        "text": "Should I send over the short outline?"
+      },
+      {
+        "id": "show-starting-approach",
+        "text": "Open to seeing the approach I'd start with?"
+      },
+      {
+        "id": "send-example",
+        "text": "Want me to send a concrete example?"
+      }
+    ],
+    "approved_claims": [
+      "Only include claims the client has approved."
+    ],
+    "forbidden_claims": [
+      "Do not invent results, guarantees, customers, statistics, or prospect intent."
+    ]
+  },
+  "personalization": {
+    "objective": "Turn a verified website fact into a relevant commercial angle.",
+    "output_field": "personalized_pitch",
+    "focus_rules_file": "campaign-template-focus.csv",
+    "max_words": 14,
+    "min_confidence": 0.72,
+    "low_confidence_action": "review",
+    "banned_phrases": [
+      "saw that",
+      "i noticed",
+      "i came across",
+      "quick question",
+      "just following up",
+      "i'll cut the fluff",
+      "2 things // checking in"
+    ],
+    "row_fallback": {
+      "enabled": true,
+      "fields": [
+        {"header": "Company description", "confidence": 0.82},
+        {"header": "AI One-Liner", "confidence": 0.78},
+        {"header": "AI Description", "confidence": 0.76},
+        {"header": "Products", "confidence": 0.74},
+        {"header": "Service Tags", "confidence": 0.73},
+        {"header": "Company keywords", "confidence": 0.72},
+        {"header": "Company industry", "confidence": 0.72}
+      ]
+    },
+    "angles": [
+      {
+        "id": "verified-signal",
+        "signal_types": ["*"],
+        "templates": [
+          {
+            "id": "direct-question",
+            "subject": "{{company_short_name}}",
+            "pitch": "Could a focused campaign reach more {{buyer_phrase}}?"
+          }
+        ]
+      }
+    ]
+  },
+  "email": {
+    "body": "Hi {{first_name}},\n\n{{personalized_pitch}}\n\n{{risk_reversal}}\n\n{{cta}}\n\n{{sender_name}}",
+    "preserve_spintax": true
+  },
+  "quality": {
+    "max_body_words": 60,
+    "max_subject_words": 8,
+    "max_focus_words": 7,
+    "max_buyer_phrase_words": 8,
+    "max_source_phrase_words": 5,
+    "max_cta_words": 12,
+    "opening_words": 4,
+    "max_opening_share": 0.45,
+    "max_exact_pitch_share": 0.1,
+    "min_rows": 20,
+    "repetition_action": "review"
+  },
+  "output": {
+    "append_fields": [
+      "personalized_subject",
+      "personalized_pitch",
+      "personalized_email",
+      "personalization_angle",
+      "personalization_template",
+      "personalization_signal_type",
+      "personalization_source_focus",
+      "personalization_focus",
+      "personalization_buyer_phrase",
+      "personalization_focus_rule",
+      "personalization_cta_variant",
+      "personalization_cta",
+      "personalization_facts",
+      "personalization_source",
+      "personalization_evidence",
+      "personalization_confidence",
+      "personalization_quality_flags",
+      "personalization_status",
+      "personalization_error"
+    ]
+  },
+  "notes": "Copy this file into campaigns/local, replace the example template, and approve the copy before production use."
+}

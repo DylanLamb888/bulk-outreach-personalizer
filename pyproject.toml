@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bulk-enrich"
+version = "0.8.0"
+description = "Deterministic bulk website enrichment and outreach personalisation"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+bulk-enrich = "bulk_enrich.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bulk_enrich"]

@@ -1,0 +1,2 @@
+id,priority,pattern,signal_types,focus,buyer_phrase
+replace-this-rule,1000,\bREPLACE_WITH_A_VERIFIED_MARKET_SIGNAL\b,*,verified commercial category,appropriate prospective buyers

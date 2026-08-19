@@ -1,0 +1,20 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example
+
+# Runtime data can contain prospect or client information.
+outputs/*
+!outputs/.gitkeep
+var/*
+!var/.gitkeep
+
+# Local campaign configurations may contain client-sensitive claims or copy.
+campaigns/local/*
+!campaigns/local/.gitkeep

@@ -1,0 +1,43 @@
+# Implementation status
+
+## Core engine complete
+
+- Portable Claude Code and Codex Skill layout
+- Python CLI with validation and production modes
+- Offer-agnostic campaign JSON validation
+- Common CSV header mapping and row-order preservation
+- Unique-domain planning and duplicate-domain reuse
+- Parallel public website fetching
+- Persistent compressed HTTP and extracted-signal caches
+- HTTPS, redirect, timeout, retry, response-size, and content-type controls
+- Private, loopback, link-local, and reserved network blocking
+- Deterministic extraction of up to three structured company facts with source evidence
+- Campaign-scoped regex mapping from raw website signals to one commercial category and buyer phrase
+- Safe secondary-fact selection when the highest-ranked website snippet is unusable
+- Conservative fallback compression for complete unmapped categories
+- Fail-closed rejection of slogans, testimonials, company-name leakage, sentence fragments, and incomplete clauses
+- Editable regex-based job-title hooks
+- Signal-routed subject/pitch pairs with stable within-angle selection
+- Independently salted, deterministic CTA variation with audit fields
+- Banned-phrase, subject-length, pitch-length, focus-length, source-overlap, and full-email word gates
+- Unique-domain batch QA for repeated openings and exact pitches
+- Confidence scoring and fail-closed review/blank behavior
+- Complete personalized subject, pitch, and email rendering
+- Atomic CSV and checksummed manifest writing
+- Automated unit and integration tests
+- Optional Firecrawl `/scrape` fallback for direct failures and weak page extraction
+- Independent Firecrawl success/failure caching and manifest counters
+- Ordered, campaign-configured input-CSV evidence fallback with explicit source and confidence auditing
+
+## Deliberate boundaries
+
+- Public websites plus company intelligence already supplied in the input CSV; no login, CAPTCHA bypass, LinkedIn scraping, or private data access
+- No per-row LLM calls or agent-written personalization
+- No email discovery or verification waterfall in this repository
+- No automatic campaign sending or Smartlead mutation
+- JavaScript-only websites may produce a weak or missing signal unless the optional Firecrawl fallback is configured
+- Self-hosted Firecrawl deployment, proxy rotation, and service hardening remain operator responsibilities
+- Client offer claims and copy still require human approval before production use
+- Market-specific categories are configuration, not engine behaviour; each campaign declares its own adjacent focus-rule CSV
+
+The engine can later accept optional API-backed fetch adapters without changing the campaign or CSV output contract.
