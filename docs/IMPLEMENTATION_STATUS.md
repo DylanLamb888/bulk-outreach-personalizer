@@ -28,6 +28,11 @@
 - Optional Firecrawl `/scrape` fallback for direct failures and weak page extraction
 - Independent Firecrawl success/failure caching and manifest counters
 - Ordered, campaign-configured input-CSV evidence fallback with explicit source and confidence auditing
+- Conversational first-name cleanup and subject-safe company-name normalization
+- Deterministically balanced CTA assignment across each batch
+- Evidence-only focus matching with most-specific-rule selection across candidate facts
+- Website-anchored confidence bounds before a CSV fallback can override public evidence
+- Buyer-phrase and CTA concentration checks in batch QA
 
 ## Deliberate boundaries
 

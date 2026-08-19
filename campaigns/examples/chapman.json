@@ -44,6 +44,7 @@
     "focus_rules_file": "chapman-focus.csv",
     "max_words": 24,
     "min_confidence": 0.72,
+    "max_candidate_confidence_drop": 0.10,
     "low_confidence_action": "review",
     "banned_phrases": [
       "saw that",
@@ -106,6 +107,8 @@
     "opening_words": 4,
     "max_opening_share": 0.45,
     "max_exact_pitch_share": 0.1,
+    "max_buyer_phrase_share": 0.3,
+    "max_cta_share": 0.3,
     "min_rows": 20,
     "repetition_action": "review"
   },

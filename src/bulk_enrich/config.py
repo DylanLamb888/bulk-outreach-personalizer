@@ -64,6 +64,13 @@ class CampaignConfig:
         return float(self.data["personalization"]["min_confidence"])
 
     @property
+    def max_candidate_confidence_drop(self) -> float:
+        """Maximum evidence-confidence loss allowed when choosing a later fact."""
+        return float(
+            self.data["personalization"]["max_candidate_confidence_drop"]
+        )
+
+    @property
     def max_words(self) -> int:
         return int(self.data["personalization"]["max_words"])
 
@@ -270,6 +277,18 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         raise CampaignConfigError(
             "'personalization.min_confidence' must be from 0 to 1"
         )
+    max_candidate_confidence_drop = personalization.get(
+        "max_candidate_confidence_drop"
+    )
+    if (
+        not isinstance(max_candidate_confidence_drop, (int, float))
+        or isinstance(max_candidate_confidence_drop, bool)
+        or not 0 <= float(max_candidate_confidence_drop) <= 1
+    ):
+        raise CampaignConfigError(
+            "'personalization.max_candidate_confidence_drop' must be a number "
+            "from 0 to 1"
+        )
     banned_phrases = _require_string_list(
         personalization,
         "banned_phrases",
@@ -400,7 +419,12 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
             raise CampaignConfigError(
                 f"'quality.{key}' must be an integer from {minimum} to {maximum}"
             )
-    for key in ("max_opening_share", "max_exact_pitch_share"):
+    for key in (
+        "max_opening_share",
+        "max_exact_pitch_share",
+        "max_buyer_phrase_share",
+        "max_cta_share",
+    ):
         value = quality.get(key)
         if (
             not isinstance(value, (int, float))

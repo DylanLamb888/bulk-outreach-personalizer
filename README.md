@@ -19,8 +19,11 @@ The engine fetches each unique public company domain once, caches the result, ex
 - fail-closed rejection of slogans, testimonials, company-name fragments, incomplete clauses, service stacks, years, promotional adjectives, and “& more” language;
 - signal-routed subject and pitch templates;
 - campaign-approved CTA variants selected independently and deterministically;
+- even deterministic CTA distribution across each batch;
+- conversational greeting and subject-safe company-name cleanup;
+- confidence-bounded CSV fallbacks that cannot displace materially stronger website evidence;
 - campaign-level banned phrases, word limits, and source-copy overlap limits;
-- batch repetition QA across unique domains;
+- batch repetition QA for openings, exact pitches, buyer phrases, and CTAs across unique domains;
 - editable title-to-hook rules;
 - confidence-based `ready`, `review`, `blank`, and `error` handling;
 - atomic CSV output and a checksummed run manifest;

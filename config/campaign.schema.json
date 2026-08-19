@@ -85,6 +85,7 @@
         "focus_rules_file",
         "max_words",
         "min_confidence",
+        "max_candidate_confidence_drop",
         "low_confidence_action",
         "banned_phrases",
         "angles"
@@ -95,6 +96,11 @@
         "focus_rules_file": { "type": "string", "minLength": 1 },
         "max_words": { "type": "integer", "minimum": 5, "maximum": 100 },
         "min_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_candidate_confidence_drop": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
@@ -187,6 +193,8 @@
         "opening_words",
         "max_opening_share",
         "max_exact_pitch_share",
+        "max_buyer_phrase_share",
+        "max_cta_share",
         "min_rows",
         "repetition_action"
       ],
@@ -200,6 +208,8 @@
         "opening_words": { "type": "integer", "minimum": 2, "maximum": 8 },
         "max_opening_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
         "max_exact_pitch_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "max_buyer_phrase_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "max_cta_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
         "min_rows": { "type": "integer", "minimum": 2 },
         "repetition_action": { "enum": ["warn", "review"] }
       }

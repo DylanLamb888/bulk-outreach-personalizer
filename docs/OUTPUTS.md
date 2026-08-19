@@ -46,6 +46,7 @@ Every output receives a JSON manifest containing:
 - page and signal cache usage;
 - status counts and fetch statistics;
 - copy-quality evaluation, warning counts, and flagged-row counts;
+- opening, exact-pitch, buyer-phrase, and CTA concentration warnings;
 - the exact non-secret run settings.
 
 Generated CSVs belong under `outputs/`; cache data belongs under `var/`. Both are excluded from Git because they can contain prospect or client information.

@@ -262,6 +262,7 @@ class CommercialFocusResult:
     focus: str
     buyer_phrase: str
     rule_id: str
+    priority: int
 
 
 @dataclass(frozen=True)
@@ -332,7 +333,9 @@ class CommercialFocusTable:
         max_focus_words: int,
         max_buyer_phrase_words: int,
     ) -> CommercialFocusResult:
-        searchable = " | ".join((company_name, source_focus, evidence))
+        # A company name can hint at a category but is not evidence for one.
+        # Mapping rules must match the selected source content itself.
+        searchable = " | ".join((source_focus, evidence))
         for rule in self.rules:
             if "*" not in rule.signal_types and signal_type not in rule.signal_types:
                 continue
@@ -347,6 +350,7 @@ class CommercialFocusTable:
                     max_buyer_phrase_words,
                 ),
                 rule_id=rule.rule_id,
+                priority=rule.priority,
             )
 
         focus = _generic_focus(source_focus, max_focus_words)
@@ -365,6 +369,7 @@ class CommercialFocusTable:
                 max_buyer_phrase_words,
             ),
             rule_id="generic-compression",
+            priority=1_000_000,
         )
 
 

@@ -3,14 +3,23 @@ import json
 import tempfile
 import threading
 import unittest
+from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
 from bulk_enrich.config import load_campaign
-from bulk_enrich.focus import CommercialFocusTable
+from bulk_enrich.focus import CommercialFocusResult, CommercialFocusTable
 from bulk_enrich.hooks import TitleHookTable
 from bulk_enrich.models import CompanyFact, SiteSignal
-from bulk_enrich.pipeline import RunOptions, _build_copy, run_enrichment
+from bulk_enrich.pipeline import (
+    RunOptions,
+    _balanced_ctas,
+    _build_copy,
+    _clean_first_name,
+    _select_focus_candidate,
+    _short_company_name,
+    run_enrichment,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -84,6 +93,70 @@ class FailedDomainEnricher:
 
 
 class PipelineTests(unittest.TestCase):
+    def test_focus_selection_keeps_weak_csv_fallback_behind_website_evidence(self) -> None:
+        def candidate(
+            *, priority: int, index: int, source_url: str, confidence: float, rule_id: str
+        ) -> tuple[int, int, CompanyFact, CommercialFocusResult]:
+            fact = CompanyFact(
+                signal_type="service",
+                focus=rule_id,
+                observation=rule_id,
+                evidence=rule_id,
+                source_url=source_url,
+                confidence=confidence,
+            )
+            focus = CommercialFocusResult(
+                source_focus=rule_id,
+                focus=rule_id,
+                buyer_phrase="companies considering a transaction",
+                rule_id=rule_id,
+                priority=priority,
+            )
+            return priority, index, fact, focus
+
+        website_generic = candidate(
+            priority=48,
+            index=0,
+            source_url="https://example.com/",
+            confidence=0.88,
+            rule_id="ma-advisory",
+        )
+        website_specific = candidate(
+            priority=41,
+            index=1,
+            source_url="https://example.com/services",
+            confidence=0.70,
+            rule_id="ma-buy-side",
+        )
+        weak_fallback = candidate(
+            priority=30,
+            index=2,
+            source_url="input:AI Description",
+            confidence=0.76,
+            rule_id="fundraising-products",
+        )
+        close_fallback = candidate(
+            priority=40,
+            index=3,
+            source_url="input:Company description",
+            confidence=0.82,
+            rule_id="ma-sell-side",
+        )
+
+        selected = _select_focus_candidate(
+            [website_generic, website_specific, weak_fallback],
+            max_confidence_drop=0.10,
+        )
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected[3].rule_id, "ma-buy-side")
+
+        selected_with_close_fallback = _select_focus_candidate(
+            [website_generic, close_fallback],
+            max_confidence_drop=0.10,
+        )
+        self.assertIsNotNone(selected_with_close_fallback)
+        self.assertEqual(selected_with_close_fallback[3].rule_id, "ma-sell-side")
+
     def test_wires_optional_firecrawl_fallback_and_manifest_stats(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -147,6 +220,59 @@ class PipelineTests(unittest.TestCase):
         )
         self.assertEqual(rendered[0].cta_variant_id, repeated.cta_variant_id)
         self.assertEqual(rendered[0].cta, repeated.cta)
+
+    def test_pitch_does_not_repeat_cta_opening(self) -> None:
+        campaign = load_campaign(
+            ROOT / "campaigns" / "examples" / "scale-olympus.json"
+        )
+        context = {
+            "company_short_name": "Example",
+            "company_focus": "financial guidance",
+            "buyer_phrase": "business owners seeking financial guidance",
+            "first_name": "Ana",
+        }
+        open_cta = next(
+            item
+            for item in campaign.cta_variants
+            if item.variant_id == "show-list-criteria"
+        )
+        for index in range(20):
+            rendered = _build_copy(
+                campaign,
+                context,
+                f"company-{index}.example",
+                "service",
+                "Unrelated evidence",
+                cta_variant=open_cta,
+            )
+            pitch_opening = " ".join(rendered.pitch.casefold().split()[:2])
+            cta_opening = " ".join(rendered.cta.casefold().split()[:2])
+            self.assertNotEqual(pitch_opening, cta_opening)
+
+    def test_batch_cta_assignment_is_deterministic_and_balanced(self) -> None:
+        campaign = load_campaign(
+            ROOT / "campaigns" / "examples" / "scale-olympus.json"
+        )
+        domains = [f"company-{index}.example" for index in range(50)]
+        first = _balanced_ctas(campaign.cta_variants, domains)
+        second = _balanced_ctas(campaign.cta_variants, domains)
+        self.assertEqual(first, second)
+        counts = Counter(item.variant_id for item in first.values())
+        self.assertLessEqual(max(counts.values()) - min(counts.values()), 1)
+
+    def test_cleans_recipient_and_company_names_for_rendering(self) -> None:
+        self.assertEqual(_clean_first_name("Carlos M."), "Carlos")
+        self.assertEqual(_clean_first_name("Steven Michael"), "Steven")
+        self.assertEqual(_clean_first_name("Anne-Marie"), "Anne-Marie")
+        examples = {
+            "Portage M&A Advisory (Mergers & Acquisitions)": "Portage M&A Advisory",
+            "CapEQ™ | B Corp": "CapEQ™",
+            "Antares International Partners, Inc": "Antares International Partners",
+            "Berkery, Noyes &": "Berkery, Noyes",
+        }
+        for raw, expected in examples.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(_short_company_name(raw), expected)
 
     def test_copy_gate_rejects_verbatim_source_phrases(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -223,13 +349,11 @@ class PipelineTests(unittest.TestCase):
                 "business owners seeking financial guidance",
             )
             self.assertEqual(rows[0]["personalization_focus_rule"], "owner-financial-guidance")
-            self.assertEqual(
+            self.assertIn(
                 rows[0]["personalization_cta_variant"],
-                "show-opening-line",
-            )
-            self.assertEqual(
-                rows[0]["personalization_cta"],
-                "Want to see the opening line I'd test?",
+                {item.variant_id for item in load_campaign(
+                    ROOT / "campaigns" / "examples" / "scale-olympus.json"
+                ).cta_variants},
             )
             self.assertIn(rows[0]["personalization_cta"], rows[0]["personalized_email"])
             self.assertEqual(rows[0]["personalization_quality_flags"], "")
@@ -312,7 +436,11 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(row["personalization_status"], "ready")
             self.assertEqual(row["personalization_source"], "input:Company description")
             self.assertEqual(row["personalization_confidence"], "0.82")
-            self.assertEqual(row["personalization_focus_rule"], "ma-sell-side")
+            self.assertEqual(row["personalization_focus_rule"], "private-company-sale")
+            self.assertEqual(
+                row["personalization_buyer_phrase"],
+                "private-company owners considering a sale",
+            )
             self.assertEqual(row["personalization_error"], "")
 
     def test_batch_repetition_gate_counts_unique_domains_and_marks_review(self) -> None:

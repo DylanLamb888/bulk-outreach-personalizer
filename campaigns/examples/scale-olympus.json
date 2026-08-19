@@ -25,16 +25,16 @@
         "text": "Open to seeing the list criteria I'd use?"
       },
       {
-        "id": "first-campaign-angle",
-        "text": "Want me to send the first campaign angle I'd test?"
+        "id": "send-example-campaign",
+        "text": "Want me to send over a short example campaign?"
       },
       {
         "id": "send-first-list",
         "text": "Should I send the first list I'd build?"
       },
       {
-        "id": "show-opening-line",
-        "text": "Want to see the opening line I'd test?"
+        "id": "show-target-companies",
+        "text": "Open to seeing a few companies I'd target first?"
       }
     ],
     "approved_claims": [
@@ -51,6 +51,7 @@
     "focus_rules_file": "scale-olympus-focus.csv",
     "max_words": 14,
     "min_confidence": 0.72,
+    "max_candidate_confidence_drop": 0.10,
     "low_confidence_action": "review",
     "banned_phrases": [
       "saw that",
@@ -141,6 +142,8 @@
     "opening_words": 4,
     "max_opening_share": 0.45,
     "max_exact_pitch_share": 0.1,
+    "max_buyer_phrase_share": 0.25,
+    "max_cta_share": 0.22,
     "min_rows": 20,
     "repetition_action": "review"
   },

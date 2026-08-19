@@ -178,6 +178,16 @@ class CommercialFocusTests(unittest.TestCase):
                 "business-valuation",
                 "business owners needing a valuation",
             ),
+            (
+                "sell-side and buy-side M&A advisory",
+                "ma-two-sided",
+                "owners or acquirers planning a transaction",
+            ),
+            (
+                "helping people buy or sell a business",
+                "business-buy-or-sell",
+                "business owners and buyers considering a transaction",
+            ),
         )
         for source_focus, rule_id, buyer_phrase in examples:
             with self.subTest(source_focus=source_focus):
@@ -191,6 +201,58 @@ class CommercialFocusTests(unittest.TestCase):
                 )
                 self.assertEqual(result.rule_id, rule_id)
                 self.assertEqual(result.buyer_phrase, buyer_phrase)
+
+    def test_campaign_mapping_preserves_one_useful_specificity(self) -> None:
+        examples = (
+            (
+                "M&A advisory firm focused exclusively on wineries and vineyards",
+                "wine-sector-ma",
+                "winery owners considering a sale",
+            ),
+            (
+                "M&A and growth advisory exclusively focused on IT services companies",
+                "it-services-ma",
+                "IT services firms considering growth or exit",
+            ),
+            (
+                "specialized in cross-border M&A transactions especially between Europe and the United States",
+                "cross-border-ma",
+                "companies considering a cross-border transaction",
+            ),
+            (
+                "off-market M&A deal origination for business acquirers",
+                "off-market-origination",
+                "acquirers looking for off-market opportunities",
+            ),
+            (
+                "private equity firm focused on acquiring middle-market companies",
+                "private-equity-acquisitions",
+                "owners considering a private equity partner",
+            ),
+        )
+        for evidence, rule_id, buyer_phrase in examples:
+            with self.subTest(evidence=evidence):
+                result = self.table.resolve(
+                    company_name="Example",
+                    signal_type="service",
+                    source_focus=evidence,
+                    evidence=evidence,
+                    max_focus_words=7,
+                    max_buyer_phrase_words=8,
+                )
+                self.assertEqual(result.rule_id, rule_id)
+                self.assertEqual(result.buyer_phrase, buyer_phrase)
+
+    def test_company_name_alone_cannot_trigger_a_mapping(self) -> None:
+        with self.assertRaises(CommercialFocusError):
+            self.table.resolve(
+                company_name="Example M&A Advisors",
+                signal_type="specialism",
+                source_focus="high-touch client experience",
+                evidence="A high-touch client experience",
+                max_focus_words=7,
+                max_buyer_phrase_words=8,
+            )
 
     def test_other_campaign_does_not_inherit_ma_mapping(self) -> None:
         table = CommercialFocusTable.load(

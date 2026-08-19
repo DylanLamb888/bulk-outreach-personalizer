@@ -80,6 +80,15 @@ class CampaignConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(CampaignConfigError, "confidence"):
                 load_campaign(path)
 
+    def test_candidate_confidence_drop_is_validated(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["personalization"]["max_candidate_confidence_drop"] = 1.5
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "confidence_drop"):
+                load_campaign(path)
+
 
 if __name__ == "__main__":
     unittest.main()

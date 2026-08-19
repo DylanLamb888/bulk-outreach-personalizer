@@ -32,7 +32,12 @@ from bulk_enrich.firecrawl import (
     FirecrawlSettings,
 )
 from bulk_enrich.extract import normalize_company_signal
-from bulk_enrich.focus import CommercialFocusError, CommercialFocusTable, longest_shared_phrase_words
+from bulk_enrich.focus import (
+    CommercialFocusError,
+    CommercialFocusResult,
+    CommercialFocusTable,
+    longest_shared_phrase_words,
+)
 from bulk_enrich.hooks import TitleHookTable
 from bulk_enrich.models import CompanyFact, SiteSignal
 from bulk_enrich.row_fallback import facts_from_row
@@ -119,6 +124,24 @@ def _stable_cta(variants: tuple[CtaVariant, ...], domain: str) -> CtaVariant:
     return variants[index]
 
 
+def _balanced_ctas(
+    variants: tuple[CtaVariant, ...],
+    domains: list[str],
+) -> dict[str, CtaVariant]:
+    """Assign approved CTAs evenly and deterministically across one batch."""
+    unique_domains = list(dict.fromkeys(domain for domain in domains if domain))
+    ordered = sorted(
+        unique_domains,
+        key=lambda domain: hashlib.sha256(
+            f"cta-balance:{domain}".encode("utf-8")
+        ).hexdigest(),
+    )
+    return {
+        domain: variants[index % len(variants)]
+        for index, domain in enumerate(ordered)
+    }
+
+
 def _angle_for_signal(campaign: CampaignConfig, signal_type: str) -> CopyAngle:
     fallback: CopyAngle | None = None
     for angle in campaign.angles:
@@ -141,10 +164,11 @@ def _build_copy(
     domain: str,
     signal_type: str,
     source_evidence: str,
+    cta_variant: CtaVariant | None = None,
 ) -> RenderedCopy:
     angle = _angle_for_signal(campaign, signal_type)
     failures: list[str] = []
-    cta_variant = _stable_cta(campaign.cta_variants, domain)
+    cta_variant = cta_variant or _stable_cta(campaign.cta_variants, domain)
     try:
         cta = " ".join(render_template(cta_variant.text, context).strip().split())
     except KeyError as exc:
@@ -166,6 +190,11 @@ def _build_copy(
             if word_count(pitch) > campaign.max_words:
                 failures.append(
                     f"{template.template_id}: pitch exceeds {campaign.max_words} words"
+                )
+                continue
+            if _opening_key(pitch, 2) == _opening_key(cta, 2):
+                failures.append(
+                    f"{template.template_id}: pitch repeats the CTA opening"
                 )
                 continue
             shared_words = longest_shared_phrase_words(pitch, source_evidence)
@@ -248,12 +277,67 @@ def _candidate_facts(
     return tuple(unique)
 
 
+def _select_focus_candidate(
+    candidates: list[tuple[int, int, CompanyFact, CommercialFocusResult]],
+    max_confidence_drop: float,
+) -> tuple[int, int, CompanyFact, CommercialFocusResult] | None:
+    """Prefer specific rules without letting weak enrichment override strong evidence.
+
+    Website facts can compete with each other regardless of confidence. A CSV fallback
+    may compete only when its confidence remains close to the strongest website fact,
+    preventing a weak generated description from walking past primary evidence.
+    """
+    if not candidates:
+        return None
+    website_confidences = [
+        fact.confidence
+        for _priority, _index, fact, _focus in candidates
+        if not fact.source_url.startswith("input:")
+    ]
+    website_floor = (
+        max(website_confidences) - max_confidence_drop
+        if website_confidences
+        else 0.0
+    )
+    eligible = [
+        candidate
+        for candidate in candidates
+        if not candidate[2].source_url.startswith("input:")
+        or candidate[2].confidence >= website_floor
+    ]
+    return min(eligible, key=lambda item: (item[0], item[1]))
+
+
+def _clean_first_name(value: str) -> str:
+    """Keep only the conversational given name from noisy provider fields."""
+    cleaned = " ".join(value.strip().split())
+    if not cleaned:
+        return ""
+    return cleaned.split()[0].strip(" ,;:")
+
+
 def _short_company_name(value: str, max_words: int = 4) -> str:
-    words = value.split()
-    suffixes = {"inc", "inc.", "llc", "ltd", "ltd.", "limited", "corp", "corp."}
-    while len(words) > 1 and words[-1].casefold() in suffixes:
-        words.pop()
-    return " ".join(words[:max_words])
+    """Create a subject-safe brand name without legal or export noise."""
+    cleaned = re.split(r"\s*(?:\||\(|\[)", value, maxsplit=1)[0]
+    words = cleaned.split()
+    suffixes = {
+        "corp",
+        "corporation",
+        "inc",
+        "incorporated",
+        "llc",
+        "ltd",
+        "limited",
+    }
+    connectors = {"&", "and"}
+    while len(words) > 1:
+        final = words[-1].strip(" ,.;:-").casefold()
+        if final in suffixes or final in connectors:
+            words.pop()
+            continue
+        break
+    result = " ".join(words[:max_words]).strip(" ,.;:&/-")
+    return re.sub(r"\s+", " ", result)
 
 
 def _opening_key(value: str, word_limit: int) -> str:
@@ -289,11 +373,19 @@ def _apply_batch_quality(
 
     opening_domains: dict[str, set[str]] = {}
     exact_domains: dict[str, set[str]] = {}
+    buyer_phrase_domains: dict[str, set[str]] = {}
+    cta_domains: dict[str, set[str]] = {}
     for domain, row in representatives.items():
         pitch = row[campaign.output_field]
         opening = _opening_key(pitch, int(quality["opening_words"]))
         opening_domains.setdefault(opening, set()).add(domain)
         exact_domains.setdefault(pitch.casefold(), set()).add(domain)
+        buyer_phrase = row.get("personalization_buyer_phrase", "").casefold()
+        if buyer_phrase:
+            buyer_phrase_domains.setdefault(buyer_phrase, set()).add(domain)
+        cta = row.get("personalization_cta", "").casefold()
+        if cta:
+            cta_domains.setdefault(cta, set()).add(domain)
 
     flags_by_domain: dict[str, list[str]] = {}
     warnings: list[dict[str, object]] = []
@@ -315,6 +407,39 @@ def _apply_batch_quality(
             message = f"exact pitch appears on {share:.1%} of rendered domains"
             warnings.append(
                 {"type": "exact_pitch_share", "count": len(affected), "share": round(share, 4)}
+            )
+            for domain in affected:
+                flags_by_domain.setdefault(domain, []).append(message)
+
+    for buyer_phrase, affected in sorted(buyer_phrase_domains.items()):
+        share = len(affected) / total
+        if share > float(quality["max_buyer_phrase_share"]):
+            message = (
+                f"buyer phrase '{buyer_phrase}' appears on {share:.1%} "
+                "of rendered domains"
+            )
+            warnings.append(
+                {
+                    "type": "buyer_phrase_share",
+                    "buyer_phrase": buyer_phrase,
+                    "count": len(affected),
+                    "share": round(share, 4),
+                }
+            )
+            for domain in affected:
+                flags_by_domain.setdefault(domain, []).append(message)
+
+    for cta, affected in sorted(cta_domains.items()):
+        share = len(affected) / total
+        if share > float(quality["max_cta_share"]):
+            message = f"CTA '{cta}' appears on {share:.1%} of rendered domains"
+            warnings.append(
+                {
+                    "type": "cta_share",
+                    "cta": cta,
+                    "count": len(affected),
+                    "share": round(share, 4),
+                }
             )
             for domain in affected:
                 flags_by_domain.setdefault(domain, []).append(message)
@@ -448,6 +573,7 @@ def run_enrichment(
     )
 
     append_fields = list(campaign.data["output"]["append_fields"])
+    cta_by_domain = _balanced_ctas(campaign.cta_variants, unique_domains)
     output_rows: list[dict[str, str]] = []
     for row, domain in zip(data.rows, domains, strict=True):
         output_row = dict(row)
@@ -501,12 +627,18 @@ def run_enrichment(
 
             fact = facts[0]
             context = context_for_row(row, data.column_map)
+            context["first_name"] = _clean_first_name(
+                str(context.get("first_name", ""))
+            )
             title = str(context.get("job_title", ""))
             hook = title_hooks.match(title)
             company_name = str(context.get("company_name", ""))
             commercial_focus = None
             focus_errors: list[str] = []
-            for candidate in facts:
+            resolved_candidates: list[
+                tuple[int, int, CompanyFact, CommercialFocusResult]
+            ] = []
+            for candidate_index, candidate in enumerate(facts):
                 try:
                     resolved_focus = commercial_focuses.resolve(
                         company_name=company_name,
@@ -519,9 +651,20 @@ def run_enrichment(
                 except CommercialFocusError as exc:
                     focus_errors.append(str(exc))
                     continue
-                fact = candidate
-                commercial_focus = resolved_focus
-                break
+                resolved_candidates.append(
+                    (
+                        resolved_focus.priority,
+                        candidate_index,
+                        candidate,
+                        resolved_focus,
+                    )
+                )
+            selected_candidate = _select_focus_candidate(
+                resolved_candidates,
+                campaign.max_candidate_confidence_drop,
+            )
+            if selected_candidate is not None:
+                _priority, _index, fact, commercial_focus = selected_candidate
             if commercial_focus is None:
                 unique_focus_errors = list(dict.fromkeys(focus_errors))
                 errors.append(
@@ -593,6 +736,7 @@ def run_enrichment(
                         domain,
                         fact.signal_type,
                         fact.evidence,
+                        cta_variant=cta_by_domain.get(domain),
                     )
                     values["personalized_subject"] = rendered.subject
                     values[campaign.output_field] = rendered.pitch

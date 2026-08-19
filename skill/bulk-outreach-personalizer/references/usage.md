@@ -37,7 +37,9 @@ The CSV declared by `personalization.focus_rules_file` maps website or configure
 
 `personalization.row_fallback.fields` is an ordered list of `{header, confidence}` objects. Missing columns are ignored. A selected fallback records `input:<header>` as its source, retains the original cell as evidence, and still passes through the same focus, copy-overlap, length, repetition, and confidence gates as website content.
 
-`offer.cta_variants` contains approved `{id, text}` pairs. A salted domain hash selects one independently from the pitch template, so reruns stay stable while a batch gets real structural variety. If the array is absent or empty, the engine uses `offer.cta`. The audit CSV records both the selected ID and rendered CTA.
+`personalization.max_candidate_confidence_drop` controls how far below the strongest mapped website fact a CSV fallback may be and still compete. Use a small value such as `0.10`: it allows a nearby, more specific description to improve the angle while blocking a weak generated field from displacing stronger public evidence. Website facts from additional pages can still compete with one another.
+
+`offer.cta_variants` contains approved `{id, text}` pairs. The engine orders unique domains by a stable hash and assigns variants round-robin, independently from the pitch template. This keeps an identical batch reproducible while preventing one CTA from dominating. If the array is absent or empty, the engine uses `offer.cta`. The audit CSV records both the selected ID and rendered CTA.
 
 ## Commands
 
