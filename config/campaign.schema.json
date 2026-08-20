@@ -48,6 +48,28 @@
         "service": { "type": "string", "minLength": 1 },
         "audience": { "type": "string", "minLength": 1 },
         "risk_reversal": { "type": "string" },
+        "risk_reversal_variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "text"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+              },
+              "text": { "type": "string", "minLength": 1 },
+              "focus_rules": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true
+              }
+            }
+          },
+          "uniqueItems": true
+        },
         "cta": { "type": "string", "minLength": 1 },
         "cta_variants": {
           "type": "array",
@@ -60,7 +82,13 @@
                 "type": "string",
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
               },
-              "text": { "type": "string", "minLength": 1 }
+              "text": { "type": "string", "minLength": 1 },
+              "focus_rules": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true
+              }
             }
           },
           "uniqueItems": true
@@ -103,6 +131,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "priority_title_patterns",
             "ready_title_patterns",
             "review_title_patterns",
             "exclude_title_patterns",
@@ -110,6 +139,12 @@
             "review_seniorities"
           ],
           "properties": {
+            "priority_title_patterns": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            },
             "ready_title_patterns": {
               "type": "array",
               "minItems": 1,
@@ -279,11 +314,13 @@
         "max_buyer_phrase_words",
         "max_source_phrase_words",
         "max_cta_words",
+        "max_offer_line_words",
         "opening_words",
         "max_opening_share",
         "max_exact_pitch_share",
         "max_buyer_phrase_share",
         "max_cta_share",
+        "max_offer_line_share",
         "min_rows",
         "repetition_action"
       ],
@@ -294,6 +331,7 @@
         "max_buyer_phrase_words": { "type": "integer", "minimum": 2, "maximum": 16 },
         "max_source_phrase_words": { "type": "integer", "minimum": 2, "maximum": 10 },
         "max_cta_words": { "type": "integer", "minimum": 3, "maximum": 20 },
+        "max_offer_line_words": { "type": "integer", "minimum": 3, "maximum": 40 },
         "opening_words": { "type": "integer", "minimum": 2, "maximum": 8 },
         "max_opening_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
         "max_exact_pitch_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
@@ -304,6 +342,7 @@
           ]
         },
         "max_cta_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "max_offer_line_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
         "min_rows": { "type": "integer", "minimum": 2 },
         "repetition_action": { "enum": ["warn", "review"] }
       }

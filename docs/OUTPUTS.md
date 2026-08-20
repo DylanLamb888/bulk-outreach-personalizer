@@ -16,6 +16,8 @@ The CLI preserves every input column and row order, then appends the campaign's 
 | `personalization_focus_rule` | Mapping rule ID, or `generic-compression` |
 | `personalization_cta_variant` | Stable campaign-approved CTA variant ID |
 | `personalization_cta` | Exact CTA rendered in the final email |
+| `personalization_offer_variant` | Stable campaign-approved offer-line variant ID and script-test cohort |
+| `personalization_offer_line` | Exact offer line rendered in the final email |
 | `personalization_facts` | Compact JSON array of up to three source-backed facts |
 | `personalization_source` | Public URL or `input:<header>` used for the company signal |
 | `personalization_evidence` | Factual text extracted from that URL or supplied CSV field |
@@ -35,17 +37,23 @@ The CLI preserves every input column and row order, then appends the campaign's 
 | `email_fit_status` | Email syntax/provider-status decision |
 | `email_fit_rule` | Matching email policy rule |
 | `email_fit_reason` | Deterministic explanation of the email decision |
+| `company_contact_status` | `primary`, `later-wave`, or `not-eligible` sequencing decision |
+| `company_contact_rank` | Deterministic contact rank within the company domain |
+| `company_contact_count` | Number of eligible contacts found for the company domain |
+| `company_contact_reason` | Explanation of the company-contact sequencing decision |
 | `outreach_status` | Final `ready`, `review`, `excluded`, or `error` decision |
 | `outreach_reason` | Combined explanation for the final decision |
 
 ## Status rules
 
 - `ready`: company, contact, email, and copy all passed their campaign gates.
-- `review`: no gate failed, but at least one gate or copy check requires human review.
+- `review`: no gate failed, but at least one gate, copy check, or company-contact sequencing rule requires human review.
 - `excluded`: at least one company, contact, email, or duplicate gate failed; send copy is blank.
 - `error`: technical rendering failed after the qualification gates passed.
 
 Only `ready` rows should be uploaded without review.
+
+Only one qualified contact per company domain can be `ready` in a single run. Additional eligible contacts retain their copy, receive a deterministic rank, and move to `review` for later outreach waves.
 
 Pass `--ready-output /path/to/smartlead-ready.csv` for upload-safe rows and `--review-output /path/to/manual-review.csv` for reviewable rendered rows while retaining the complete audit CSV.
 
@@ -60,8 +68,10 @@ Every output receives a JSON manifest containing:
 - page and signal cache usage;
 - status counts and fetch statistics;
 - company, contact, email, final-status, duplicate-email, and rule-usage counts;
+- company-contact group, multi-contact company, and later-wave counts;
+- script-test cohort counts across unique rendered companies;
 - copy-quality evaluation, warning counts, and flagged-row counts;
-- opening, exact-pitch, buyer-phrase, and CTA concentration warnings;
+- opening, exact-pitch, buyer-phrase, offer-line, and CTA concentration warnings;
 - the exact non-secret run settings.
 - immutable copies and hashes of the campaign JSON and focus CSV used for the run.
 

@@ -9,37 +9,51 @@
   "offer": {
     "service": "A done-for-you cold email system that books qualified sales calls with B2B decision-makers.",
     "audience": "Owners and commercial leaders at B2B service companies.",
-    "risk_reversal": "We build the lists, run the outreach and only charge per qualified call delivered.",
-    "cta": "Want the buyer segments and copy I'd test?",
+    "risk_reversal": "You pay a small tech fee upfront, then a fee for each qualified call.",
+    "risk_reversal_variants": [
+      {
+        "id": "v1-performance",
+        "text": "You pay a small tech fee upfront, then a fee for each qualified call."
+      },
+      {
+        "id": "v2-done-for-you",
+        "text": "We handle the lists, outreach and replies for a small tech fee, then charge per qualified call."
+      },
+      {
+        "id": "v3-small-upfront",
+        "text": "We charge a small tech fee to get started, then you pay for the qualified calls we deliver."
+      }
+    ],
+    "cta": "Want me to send the 3 buyer segments I'd test?",
     "cta_variants": [
       {
         "id": "send-buyer-segments",
-        "text": "Want me to send over the buyer segments I'd test?"
+        "text": "Want me to send the 3 buyer segments I'd test?"
       },
       {
         "id": "send-audience-messaging",
-        "text": "Should I send over the audience and copy I'd test first?"
+        "text": "Should I send over the 2 message angles I'd test first?"
       },
       {
         "id": "show-list-criteria",
-        "text": "Open to seeing the list criteria I'd use?"
+        "text": "Open to seeing the 5 list criteria I'd use?"
       },
       {
         "id": "send-example-campaign",
-        "text": "Want me to send over a short example campaign?"
+        "text": "Want me to send over a 3-email example campaign?"
       },
       {
         "id": "send-first-list",
-        "text": "Should I send the first list I'd build?"
+        "text": "Should I send over a 20-account sample list?"
       },
       {
         "id": "show-target-companies",
-        "text": "Open to seeing a few companies I'd target first?"
+        "text": "Open to seeing the first 10 companies I'd target?"
       }
     ],
     "approved_claims": [
-      "Scale Olympus builds the lists and runs the outbound system.",
-      "The commercial model is pay per qualified call delivered."
+      "Scale Olympus handles the lists, outreach, and replies.",
+      "The commercial model is a small tech fee plus a fee per qualified call delivered."
     ],
     "forbidden_claims": [
       "Do not invent call volumes, client results, guarantees, named customers, or prospect intent."
@@ -51,6 +65,12 @@
       "fallback_fields": ["Company description", "Company keywords", "Company industry"]
     },
     "contact": {
+      "priority_title_patterns": [
+        "\\b(?:owner|co-owner|founder|co-founder|founding partner|managing partner)\\b",
+        "\\b(?:chief executive officer|ceo|president|partner)\\b",
+        "\\b(?:managing director|principal)\\b",
+        "\\b(?:vice president|vp|director|head of)\\b"
+      ],
       "ready_title_patterns": [
         "\\b(?:owner|co-owner|founder|co-founder|chief executive officer|ceo|president|managing partner|managing director|partner|principal|managing member)\\b"
       ],
@@ -88,6 +108,7 @@
       "i'll cut the fluff",
       "2 things // checking in",
       "worth a quick chat",
+      "the model is",
       "& more",
       "and more"
     ],
@@ -116,7 +137,7 @@
           {
             "id": "focused-reach",
             "subject": "{{company_short_name}} outreach",
-            "pitch": "Could a focused campaign reach more {{buyer_phrase}}?"
+            "pitch": "Could a campaign start more conversations with {{buyer_phrase}}?"
           },
           {
             "id": "useful-reach",
@@ -146,7 +167,7 @@
           {
             "id": "simple-reach",
             "subject": "{{company_short_name}} lead idea",
-            "pitch": "Does reaching more {{buyer_phrase}} make sense?"
+            "pitch": "Could outreach to {{buyer_phrase}} be useful?"
           }
         ]
       }
@@ -163,11 +184,13 @@
     "max_buyer_phrase_words": 8,
     "max_source_phrase_words": 5,
     "max_cta_words": 12,
+    "max_offer_line_words": 24,
     "opening_words": 4,
     "max_opening_share": 0.45,
     "max_exact_pitch_share": 0.1,
     "max_buyer_phrase_share": null,
     "max_cta_share": 0.22,
+    "max_offer_line_share": 0.4,
     "min_rows": 20,
     "repetition_action": "review"
   },
@@ -185,6 +208,8 @@
       "personalization_focus_rule",
       "personalization_cta_variant",
       "personalization_cta",
+      "personalization_offer_variant",
+      "personalization_offer_line",
       "personalization_facts",
       "personalization_source",
       "personalization_evidence",
@@ -204,6 +229,10 @@
       "email_fit_status",
       "email_fit_rule",
       "email_fit_reason",
+      "company_contact_status",
+      "company_contact_rank",
+      "company_contact_count",
+      "company_contact_reason",
       "outreach_status",
       "outreach_reason"
     ]

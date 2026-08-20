@@ -54,6 +54,12 @@ class OfferAgnosticTests(unittest.TestCase):
                     "service": "Monthly bookkeeping for property managers.",
                     "audience": "Commercial property managers.",
                     "risk_reversal": "The first month is free if the books are not current.",
+                    "risk_reversal_variants": [
+                        {
+                            "id": "first-month-free",
+                            "text": "The first month is free if the books are not current.",
+                        }
+                    ],
                     "cta": "Want me to send a sample month-end report?",
                     "cta_variants": [
                         {

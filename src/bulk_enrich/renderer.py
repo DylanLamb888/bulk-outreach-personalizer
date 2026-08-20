@@ -44,7 +44,9 @@ def render_email(
     context.update(
         {
             campaign.output_field: personalized_pitch,
-            "risk_reversal": data["offer"].get("risk_reversal", ""),
+            "risk_reversal": row_context.get(
+                "risk_reversal", data["offer"].get("risk_reversal", "")
+            ),
             "cta": row_context.get("cta", data["offer"].get("cta", "")),
             "sender_name": data["sender"]["name"],
         }

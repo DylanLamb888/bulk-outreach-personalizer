@@ -6,7 +6,7 @@ Each campaign defines:
 
 - `status`: keep `test_only` until the copy is approved;
 - `sender`: sender name used in the final email;
-- `offer`: service, audience, risk reversal, fallback CTA, CTA variants, approved claims, and forbidden claims;
+- `offer`: service, audience, fallback risk reversal, offer-line variants, fallback CTA, CTA variants, approved claims, and forbidden claims;
 - `qualification`: company fallback corroboration, contact title/seniority rules, and email-status policy;
 - `personalization.objective`: human-readable campaign intent;
 - `personalization.focus_rules_file`: campaign-relative path to the market-specific mapping CSV;
@@ -15,7 +15,7 @@ Each campaign defines:
 - `personalization.min_confidence`: threshold for a `ready` row;
 - `personalization.low_confidence_action`: render for `review` or leave `blank`;
 - `personalization.row_fallback`: ordered input CSV headers and confidence scores used only when first-party website evidence is unavailable;
-- `quality`: subject, pitch, CTA, focus, source-overlap, full-email, and batch-repetition gates;
+- `quality`: subject, pitch, offer-line, CTA, focus, source-overlap, full-email, and batch-repetition gates;
 - `email`: subject and complete body template;
 - `output.append_fields`: required audit and upload columns.
 
@@ -38,7 +38,9 @@ The CSV declared by `personalization.focus_rules_file` maps evidence to a short 
 
 `personalization.row_fallback.fields` is an ordered list of `{header, confidence}` objects. Missing columns are ignored. CSV fields are considered only when first-party website evidence is unavailable. At least the configured number of approved fields must match the same focus rule; the result remains review-only. A selected fallback records `input:<header>` as its source and retains the original cell as evidence.
 
-`offer.cta_variants` contains approved `{id, text}` pairs. The engine orders unique domains by a stable hash and assigns variants round-robin, independently from the pitch template. This keeps an identical batch reproducible while preventing one CTA from dominating. If the array is absent or empty, the engine uses `offer.cta`. The audit CSV records both the selected ID and rendered CTA.
+`offer.cta_variants` contains approved `{id, text}` pairs. The engine orders unique domains by a stable hash and assigns variants round-robin, independently from the pitch template. This keeps an identical batch reproducible while preventing one CTA from dominating. A variant can declare `focus_rules`; exact matches take precedence over the required `*` fallback. If the array is absent or empty, the engine uses `offer.cta`. The audit CSV records both the selected ID and rendered CTA.
+
+`offer.risk_reversal_variants` follows the same deterministic distribution. Keep each line short and natural, vary the sentence structure rather than swapping synonyms, and describe only the approved commercial model. A variant can declare `focus_rules` to target one or more campaign focus-rule IDs. Exact matches take precedence over the required `*` fallback. If the array is absent or empty, the engine uses `offer.risk_reversal`. The audit CSV records the selected ID and exact rendered line. Use `personalization_offer_variant` as the script-test cohort, and use the manifest's `script_test.cohort_counts` to verify the distribution.
 
 ## Commands
 
@@ -71,3 +73,7 @@ The repository's ignored `.env` can set `FIRECRAWL_API_URL=http://localhost:3002
 ## Output review
 
 The output keeps original rows and columns. Audit each line through company, contact, email, copy, and final outreach decisions. Only `outreach_status=ready` rows enter the ready output; review rows retain copy, while excluded rows keep evidence and reasons but blank send copy. The manifest records content-addressed, immutable snapshots and hashes of the campaign and focus rules.
+
+Company-contact sequencing ranks eligible contacts within each normalized company domain using qualification status, campaign title priority, configured seniority order, and original input order. Only rank 1 can remain ready. Later ranks retain their personalised copy but move to review with an explicit wave reason.
+
+`qualification.contact.priority_title_patterns` is an ordered list of campaign-specific regular expressions used before provider seniority when selecting rank 1. Put the most commercially relevant decision-maker pattern first.

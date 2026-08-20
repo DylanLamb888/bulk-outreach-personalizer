@@ -34,6 +34,14 @@ class CopyAngle:
 class CtaVariant:
     variant_id: str
     text: str
+    focus_rules: tuple[str, ...] = ("*",)
+
+
+@dataclass(frozen=True)
+class OfferLineVariant:
+    variant_id: str
+    text: str
+    focus_rules: tuple[str, ...] = ("*",)
 
 
 @dataclass(frozen=True)
@@ -90,10 +98,49 @@ class CampaignConfig:
                 CtaVariant(
                     variant_id=str(item["id"]),
                     text=str(item["text"]),
+                    focus_rules=tuple(
+                        str(rule) for rule in item.get("focus_rules", ["*"])
+                    ),
                 )
                 for item in configured
             )
         return (CtaVariant(variant_id="default-cta", text=str(self.data["offer"]["cta"])),)
+
+    @property
+    def default_cta_variants(self) -> tuple[CtaVariant, ...]:
+        return tuple(
+            variant for variant in self.cta_variants if "*" in variant.focus_rules
+        )
+
+    @property
+    def offer_line_variants(self) -> tuple[OfferLineVariant, ...]:
+        configured = self.data["offer"].get("risk_reversal_variants")
+        if configured:
+            return tuple(
+                OfferLineVariant(
+                    variant_id=str(item["id"]),
+                    text=str(item["text"]),
+                    focus_rules=tuple(
+                        str(rule) for rule in item.get("focus_rules", ["*"])
+                    ),
+                )
+                for item in configured
+            )
+        return (
+            OfferLineVariant(
+                variant_id="default-offer-line",
+                text=str(self.data["offer"].get("risk_reversal", "")),
+                focus_rules=("*",),
+            ),
+        )
+
+    @property
+    def default_offer_line_variants(self) -> tuple[OfferLineVariant, ...]:
+        return tuple(
+            variant
+            for variant in self.offer_line_variants
+            if "*" in variant.focus_rules
+        )
 
     @property
     def angles(self) -> tuple[CopyAngle, ...]:
@@ -136,6 +183,10 @@ class CampaignConfig:
     @property
     def max_cta_words(self) -> int:
         return int(self.data["quality"]["max_cta_words"])
+
+    @property
+    def max_offer_line_words(self) -> int:
+        return int(self.data["quality"].get("max_offer_line_words", 24))
 
     @property
     def row_fallback_fields(self) -> tuple[RowFallbackField, ...]:
@@ -181,6 +232,15 @@ class CampaignConfig:
         return tuple(
             str(item)
             for item in self.data["qualification"]["contact"]["exclude_title_patterns"]
+        )
+
+    @property
+    def contact_priority_patterns(self) -> tuple[str, ...]:
+        return tuple(
+            str(item)
+            for item in self.data["qualification"]["contact"][
+                "priority_title_patterns"
+            ]
         )
 
     @property
@@ -270,6 +330,13 @@ def _contains_banned_phrase(value: str, banned_phrases: list[str]) -> str:
     return next((phrase for phrase in banned_phrases if phrase.casefold() in lowered), "")
 
 
+def forbidden_copy_character(value: str) -> str:
+    """Return a human-readable name for a character prohibited in outreach copy."""
+    if "\u2014" in value:
+        return "em dash"
+    return ""
+
+
 def validate_campaign_data(data: dict[str, Any]) -> None:
     if not isinstance(data, dict):
         raise CampaignConfigError("campaign configuration must be a JSON object")
@@ -305,6 +372,7 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         raise CampaignConfigError("'offer.cta_variants' must be an array")
     cta_ids: set[str] = set()
     cta_copy: list[tuple[str, str]] = []
+    has_default_cta = False
     for index, variant in enumerate(cta_variants):
         label = f"offer.cta_variants[{index}]"
         if not isinstance(variant, dict):
@@ -315,7 +383,70 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
             raise CampaignConfigError(f"duplicate CTA variant id: {variant_id}")
         cta_ids.add(variant_id)
         cta_text = _require_nonempty_string(variant, "text", label=f"{label}.text")
+        focus_rules = variant.get("focus_rules", ["*"])
+        if (
+            not isinstance(focus_rules, list)
+            or not focus_rules
+            or not all(isinstance(rule, str) and rule.strip() for rule in focus_rules)
+        ):
+            raise CampaignConfigError(
+                f"'{label}.focus_rules' must be a non-empty array of strings"
+            )
+        normalized_focus_rules = [rule.strip() for rule in focus_rules]
+        if len(set(normalized_focus_rules)) != len(normalized_focus_rules):
+            raise CampaignConfigError(
+                f"'{label}.focus_rules' must not contain duplicates"
+            )
+        for rule in normalized_focus_rules:
+            if rule != "*":
+                _validate_slug(rule, f"{label}.focus_rules")
+        has_default_cta = has_default_cta or "*" in normalized_focus_rules
         cta_copy.append((f"{label}.text", cta_text))
+    if cta_variants and not has_default_cta:
+        raise CampaignConfigError(
+            "offer.cta_variants must include at least one '*' focus-rule fallback"
+        )
+    offer_line_variants = offer.get("risk_reversal_variants", [])
+    if not isinstance(offer_line_variants, list):
+        raise CampaignConfigError("'offer.risk_reversal_variants' must be an array")
+    offer_line_ids: set[str] = set()
+    offer_line_copy: list[tuple[str, str]] = []
+    has_default_offer_line = False
+    for index, variant in enumerate(offer_line_variants):
+        label = f"offer.risk_reversal_variants[{index}]"
+        if not isinstance(variant, dict):
+            raise CampaignConfigError(f"'{label}' must be an object")
+        variant_id = _require_nonempty_string(variant, "id", label=f"{label}.id")
+        _validate_slug(variant_id, f"{label}.id")
+        if variant_id in offer_line_ids:
+            raise CampaignConfigError(f"duplicate offer-line variant id: {variant_id}")
+        offer_line_ids.add(variant_id)
+        variant_text = _require_nonempty_string(
+            variant, "text", label=f"{label}.text"
+        )
+        focus_rules = variant.get("focus_rules", ["*"])
+        if (
+            not isinstance(focus_rules, list)
+            or not focus_rules
+            or not all(isinstance(rule, str) and rule.strip() for rule in focus_rules)
+        ):
+            raise CampaignConfigError(
+                f"'{label}.focus_rules' must be a non-empty array of strings"
+            )
+        normalized_focus_rules = [rule.strip() for rule in focus_rules]
+        if len(set(normalized_focus_rules)) != len(normalized_focus_rules):
+            raise CampaignConfigError(
+                f"'{label}.focus_rules' must not contain duplicates"
+            )
+        for rule in normalized_focus_rules:
+            if rule != "*":
+                _validate_slug(rule, f"{label}.focus_rules")
+        has_default_offer_line = has_default_offer_line or "*" in normalized_focus_rules
+        offer_line_copy.append((f"{label}.text", variant_text))
+    if offer_line_variants and not has_default_offer_line:
+        raise CampaignConfigError(
+            "offer.risk_reversal_variants must include at least one '*' focus-rule fallback"
+        )
     for list_key in ("approved_claims", "forbidden_claims"):
         _require_string_list(offer, list_key, label=f"offer.{list_key}")
 
@@ -415,6 +546,7 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
 
     contact_qualification = _require_mapping(qualification, "contact")
     for key, allow_empty in (
+        ("priority_title_patterns", False),
         ("ready_title_patterns", False),
         ("review_title_patterns", True),
         ("exclude_title_patterns", True),
@@ -566,6 +698,7 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         "max_buyer_phrase_words": (2, 16),
         "max_source_phrase_words": (2, 10),
         "max_cta_words": (3, 20),
+        "max_offer_line_words": (3, 40),
     }
     for key, (minimum, maximum) in integer_ranges.items():
         value = quality.get(key)
@@ -577,6 +710,7 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         "max_opening_share",
         "max_exact_pitch_share",
         "max_cta_share",
+        "max_offer_line_share",
     ):
         value = quality.get(key)
         if (
@@ -602,12 +736,18 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
     configured_copy = [
         ("offer.service", str(offer["service"])),
         ("offer.risk_reversal", str(offer["risk_reversal"])),
+        *offer_line_copy,
         ("offer.cta", str(offer["cta"])),
         *cta_copy,
         ("email.body", body),
         *copy_values,
     ]
     for label, value in configured_copy:
+        forbidden_character = forbidden_copy_character(value)
+        if forbidden_character:
+            raise CampaignConfigError(
+                f"'{label}' contains forbidden character: {forbidden_character}"
+            )
         banned = _contains_banned_phrase(value, banned_phrases)
         if banned:
             raise CampaignConfigError(
@@ -637,6 +777,8 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         "personalization_focus_rule",
         "personalization_cta_variant",
         "personalization_cta",
+        "personalization_offer_variant",
+        "personalization_offer_line",
         "personalization_facts",
         "personalization_source",
         "personalization_evidence",
@@ -656,6 +798,10 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         "email_fit_status",
         "email_fit_rule",
         "email_fit_reason",
+        "company_contact_status",
+        "company_contact_rank",
+        "company_contact_count",
+        "company_contact_reason",
         "outreach_status",
         "outreach_reason",
     }

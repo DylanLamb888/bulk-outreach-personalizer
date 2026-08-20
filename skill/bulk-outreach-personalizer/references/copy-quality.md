@@ -9,12 +9,18 @@ Use website facts inside the commercial question or offer. Do not lead with a se
 - Try the site's other extracted facts when the first snippet is a slogan, testimonial, company name, or incomplete clause; do not force the first fact into copy.
 - Use `{{buyer_phrase}}` when the offer depends on reaching prospective buyers; use `{{company_focus}}` when the offer genuinely needs the category itself.
 - Keep a focus to roughly seven words and a pitch to roughly 8–14 words.
+- Prefer concrete people and actions over abstract labels. For example, use "companies looking to sell a division" instead of "corporate teams considering a carve-out".
 - Reject dates, heritage claims, “& more”, promotional adjectives, comma-separated catalogues, and stacked USPs from send copy.
 - Do not copy more than the configured number of consecutive words from the source evidence.
 - Give each signal type an appropriate commercial angle. Surface-level synonym rotation is not a substitute for angle routing.
 - Keep market-specific buyer categories in the campaign's focus-rule CSV. Never make one campaign's niche terminology a global engine rule.
 - Use a concrete CTA the sender can actually fulfil, such as buyer segments, sample copy, a teardown, or a relevant outline.
+- When a numbered asset makes the next step clearer, state the honest quantity directly, such as 3 segments, 5 criteria, or a 20-account sample. Never invent performance, guarantee, volume, or proof numbers.
 - Keep several approved CTA structures when the campaign has a genuinely useful asset to offer. Balance them deterministically across each batch, independently from the pitch template; do not use random synonym spinning.
+- Keep several approved offer-line structures when the email includes a commercial model or risk reversal. Write them as a colleague would, distribute them deterministically, and avoid repeating one polished sales sentence across the batch.
+- Scope offer lines to campaign focus rules when different buyer types need materially different language. Do not describe corporate teams, advisers, or other non-owner audiences as owners.
+- Scope CTAs to campaign focus rules when the promised asset uses buyer-specific language.
+- Do not use em dashes in configured or rendered outreach copy.
 - Never offer to show the opening line after the email has already displayed it. Each CTA must offer a distinct, deliverable next asset.
 - Clean provider-added middle initials from greetings and legal suffixes, parentheticals, separators, or dangling connectors from subject-line company names.
 - Prefer the most specific configured focus rule supported by first-party evidence. Use CSV fallback only when website evidence is unavailable, require the approved number of fields to agree on the same rule, and keep the result review-only. A company name may corroborate another approved field but must never qualify alone.
@@ -25,9 +31,10 @@ Use website facts inside the commercial question or offer. Do not lead with a se
 - Treat generic compression as audit context only: unmatched evidence is not proof of campaign fit and must be excluded from the ready output.
 - Put overused openings and client-specific exclusions in `banned_phrases`.
 - Keep multiple approved sentence structures per common angle. Select them deterministically by domain and monitor opening frequency across the batch.
+- Do not place several contacts from the same company in one ready file. Keep the strongest contact ready and hold the rest for later waves.
 
 ## Batch gate
 
-The engine measures opening, exact-pitch, buyer-phrase, and CTA frequency across unique domains after rendering. Duplicate contacts at the same company count once. Above the configured minimum batch size, excessive repetition is written to `personalization_quality_flags` and can move affected rows from `ready` to `review`.
+The engine measures opening, exact-pitch, buyer-phrase, offer-line, and CTA frequency across unique domains after rendering. Duplicate contacts at the same company count once. Above the configured minimum batch size, excessive repetition is written to `personalization_quality_flags` and can move affected rows from `ready` to `review`.
 
 Review the manifest's `quality` object before uploading the ready-only CSV.

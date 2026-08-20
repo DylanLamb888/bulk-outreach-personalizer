@@ -19,18 +19,22 @@
 - Campaign-specific title and seniority qualification with mandatory title matching
 - Configurable provider email-status gates plus conservative syntax-only fallback
 - Deterministic duplicate-email winner selection
+- Deterministic company-contact ranking with one ready contact per company domain
 - Safe secondary-fact selection when the highest-ranked website snippet is unusable
 - Conservative fallback compression for complete unmapped categories
 - Fail-closed rejection of slogans, testimonials, company-name leakage, sentence fragments, and incomplete clauses
 - Editable regex-based job-title hooks
 - Signal-routed subject/pitch pairs with stable within-angle selection
-- Independently salted, deterministic CTA variation with audit fields
-- Banned-phrase, subject-length, pitch-length, focus-length, source-overlap, and full-email word gates
+- Independently salted, deterministic offer-line and CTA variation with audit fields
+- Campaign-scoped offer-line targeting by matched focus rule with a required fallback
+- Campaign-scoped CTA targeting by matched focus rule with a required fallback
+- Banned-phrase, forbidden-punctuation, subject-length, pitch-length, offer-line-length, focus-length, source-overlap, and full-email word gates
 - Unique-domain batch QA for repeated openings and exact pitches
 - Confidence scoring and fail-closed review/blank behavior
 - Complete personalized subject, pitch, and email rendering
 - Atomic CSV and checksummed manifest writing
 - Audit, ready-only, and manual-review CSV outputs
+- Later-wave review routing for additional eligible contacts at the same company
 - Immutable campaign and focus-rule snapshots for every run
 - Automated unit and integration tests
 - Clean-room non-M&A integration coverage for client-specific offers and mappings
@@ -38,10 +42,10 @@
 - Independent Firecrawl success/failure caching and manifest counters
 - Ordered, campaign-configured input-CSV evidence fallback with explicit source and confidence auditing
 - Conversational first-name cleanup and subject-safe company-name normalization
-- Deterministically balanced CTA assignment across each batch
+- Deterministically balanced offer-line and CTA assignment across each batch
 - Evidence-only focus matching with most-specific-rule selection across candidate facts
 - Fail-closed first-party precedence: CSV evidence is considered only when the website is unavailable
-- Buyer-phrase and CTA concentration checks in batch QA
+- Buyer-phrase, offer-line, and CTA concentration checks in batch QA
 
 ## Deliberate boundaries
 

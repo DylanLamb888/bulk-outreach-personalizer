@@ -221,6 +221,7 @@ def _validation_payload(
             ),
             "fallback_min_agreeing_fields": campaign.fallback_min_agreeing_fields,
             "fallback_fields": list(campaign.fallback_qualification_fields),
+            "priority_title_patterns": len(campaign.contact_priority_patterns),
             "ready_title_patterns": len(campaign.ready_title_patterns),
             "review_title_patterns": len(campaign.review_title_patterns),
             "exclude_title_patterns": len(campaign.excluded_title_patterns),
@@ -228,6 +229,8 @@ def _validation_payload(
         },
         "copy_angles": len(campaign.angles),
         "copy_templates": template_count,
+        "offer_line_variants": len(campaign.offer_line_variants),
+        "cta_variants": len(campaign.cta_variants),
         "banned_phrases": len(campaign.banned_phrases),
         "quality_gate": campaign.data["quality"],
         "firecrawl": {

@@ -7,17 +7,19 @@ from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
-from bulk_enrich.config import load_campaign
+from bulk_enrich.config import OfferLineVariant, load_campaign
 from bulk_enrich.focus import CommercialFocusResult, CommercialFocusTable
 from bulk_enrich.hooks import TitleHookTable
 from bulk_enrich.models import CompanyFact, SiteSignal
 from bulk_enrich.pipeline import (
     RunOptions,
     _balanced_ctas,
+    _balanced_offer_lines,
     _build_copy,
     _clean_first_name,
     _immutable_snapshot,
     _select_company_candidate,
+    _sequence_company_contacts,
     _short_company_name,
     run_enrichment,
 )
@@ -400,6 +402,93 @@ class PipelineTests(unittest.TestCase):
         counts = Counter(item.variant_id for item in first.values())
         self.assertLessEqual(max(counts.values()) - min(counts.values()), 1)
 
+    def test_batch_offer_line_assignment_is_deterministic_and_balanced(self) -> None:
+        variants = (
+            OfferLineVariant("one", "First approved line."),
+            OfferLineVariant("two", "Second approved line."),
+            OfferLineVariant("three", "Third approved line."),
+        )
+        domains = [f"company-{index}.example" for index in range(10)]
+        first = _balanced_offer_lines(variants, domains)
+        second = _balanced_offer_lines(variants, list(reversed(domains)))
+        self.assertEqual(first, second)
+        counts = Counter(item.variant_id for item in first.values())
+        self.assertLessEqual(max(counts.values()) - min(counts.values()), 1)
+
+    def test_offer_line_selection_prefers_an_exact_focus_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = json.loads(
+                (ROOT / "campaigns" / "examples" / "scale-olympus.json").read_text()
+            )
+            payload["offer"]["risk_reversal_variants"] = [
+                {
+                    "id": "owner-fallback",
+                    "text": "You only pay for qualified owner conversations.",
+                },
+                {
+                    "id": "corporate-seller",
+                    "text": "You only pay for qualified conversations with potential sellers.",
+                    "focus_rules": ["corporate-carve-outs"],
+                },
+            ]
+            campaign_path = Path(tmp) / "campaign.json"
+            campaign_path.write_text(json.dumps(payload), encoding="utf-8")
+            campaign = load_campaign(campaign_path)
+            rendered = _build_copy(
+                campaign,
+                {
+                    "company_short_name": "Example",
+                    "company_focus": "corporate carve-outs",
+                    "buyer_phrase": "companies looking to sell a division",
+                    "first_name": "Ana",
+                },
+                "example.com",
+                "service",
+                "We acquire non-core corporate divisions",
+                focus_rule="corporate-carve-outs",
+            )
+
+            self.assertEqual(rendered.offer_variant_id, "corporate-seller")
+            self.assertIn("potential sellers", rendered.body)
+            self.assertNotIn("owner conversations", rendered.body)
+
+    def test_cta_selection_prefers_an_exact_focus_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = json.loads(
+                (ROOT / "campaigns" / "examples" / "scale-olympus.json").read_text()
+            )
+            payload["offer"]["cta_variants"] = [
+                {
+                    "id": "owner-segments",
+                    "text": "Want me to send the 3 owner segments I'd test?",
+                },
+                {
+                    "id": "carveout-criteria",
+                    "text": "Open to seeing the 5 carve-out criteria I'd use?",
+                    "focus_rules": ["corporate-carve-outs"],
+                },
+            ]
+            campaign_path = Path(tmp) / "campaign.json"
+            campaign_path.write_text(json.dumps(payload), encoding="utf-8")
+            campaign = load_campaign(campaign_path)
+            rendered = _build_copy(
+                campaign,
+                {
+                    "company_short_name": "Example",
+                    "company_focus": "corporate carve-outs",
+                    "buyer_phrase": "companies looking to sell a division",
+                    "first_name": "Ana",
+                },
+                "example.com",
+                "service",
+                "We acquire non-core corporate divisions",
+                focus_rule="corporate-carve-outs",
+            )
+
+            self.assertEqual(rendered.cta_variant_id, "carveout-criteria")
+            self.assertIn("5 carve-out criteria", rendered.body)
+            self.assertNotIn("owner segments", rendered.body)
+
     def test_cleans_recipient_and_company_names_for_rendering(self) -> None:
         self.assertEqual(_clean_first_name("Carlos M."), "Carlos")
         self.assertEqual(_clean_first_name("Steven Michael"), "Steven")
@@ -415,6 +504,51 @@ class PipelineTests(unittest.TestCase):
         for raw, expected in examples.items():
             with self.subTest(raw=raw):
                 self.assertEqual(_short_company_name(raw), expected)
+
+    def test_company_contact_sequencing_prefers_campaign_title_priority(self) -> None:
+        campaign = load_campaign(
+            ROOT / "campaigns" / "examples" / "scale-olympus.json"
+        )
+
+        def eligible_row(title: str, seniority: str) -> dict[str, str]:
+            return {
+                "Job title": title,
+                "Job seniority": seniority,
+                "personalized_email": "Hi there",
+                "personalization_status": "ready",
+                "company_fit_status": "qualified",
+                "company_fit_rule": "core",
+                "company_fit_reason": "core fit",
+                "contact_fit_status": "qualified",
+                "contact_fit_rule": "approved-title",
+                "contact_fit_reason": "approved contact",
+                "email_fit_status": "qualified",
+                "email_fit_rule": "verified",
+                "email_fit_reason": "verified email",
+                "outreach_status": "ready",
+                "outreach_reason": "all gates passed",
+            }
+
+        rows = [
+            eligible_row("Managing Partner", "Partner"),
+            eligible_row("Managing Director", "C-Suite"),
+        ]
+        report = _sequence_company_contacts(
+            rows,
+            ["same-company.example", "same-company.example"],
+            campaign,
+            seniority_header="Job seniority",
+            title_header="Job title",
+        )
+
+        self.assertEqual(rows[0]["company_contact_status"], "primary")
+        self.assertEqual(rows[0]["outreach_status"], "ready")
+        self.assertEqual(rows[0]["company_contact_rank"], "1")
+        self.assertEqual(rows[1]["company_contact_status"], "later-wave")
+        self.assertEqual(rows[1]["outreach_status"], "review")
+        self.assertEqual(rows[1]["company_contact_rank"], "2")
+        self.assertEqual(report["multi_contact_companies"], 1)
+        self.assertEqual(report["later_wave_rows"], 1)
 
     def test_copy_gate_rejects_verbatim_source_phrases(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -479,7 +613,11 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(rows[0]["Email"], "ana@example.com")
             self.assertEqual(rows[0]["personalization_status"], "ready")
             self.assertIn("private-company owners considering a sale", rows[0]["personalized_pitch"])
-            self.assertIn("only charge per qualified call", rows[0]["personalized_email"])
+            self.assertTrue(rows[0]["personalization_offer_variant"])
+            self.assertTrue(rows[0]["personalization_offer_line"])
+            self.assertIn(
+                rows[0]["personalization_offer_line"], rows[0]["personalized_email"]
+            )
             self.assertIn("Dylan", rows[0]["personalized_email"])
             self.assertEqual(rows[0]["personalization_signal_type"], "service")
             self.assertTrue(rows[0]["personalization_angle"])
@@ -505,15 +643,40 @@ class PipelineTests(unittest.TestCase):
 
             with ready_output.open("r", encoding="utf-8-sig", newline="") as handle:
                 ready_rows = list(csv.DictReader(handle))
-            self.assertEqual(len(ready_rows), 2)
+            self.assertEqual(rows[0]["company_contact_status"], "primary")
+            self.assertEqual(rows[0]["company_contact_rank"], "1")
+            self.assertEqual(rows[1]["company_contact_status"], "later-wave")
+            self.assertEqual(rows[1]["company_contact_rank"], "2")
+            self.assertEqual(rows[1]["outreach_status"], "review")
+            self.assertIn("hold for wave 2", rows[1]["outreach_reason"])
+            self.assertEqual(len(ready_rows), 1)
             self.assertTrue(all(row["outreach_status"] == "ready" for row in ready_rows))
             self.assertTrue(all(row["personalization_cta"] for row in ready_rows))
 
             saved_manifest = json.loads(manifest_path.read_text())
-            self.assertEqual(saved_manifest["output"]["status_counts"], {"excluded": 1, "ready": 2})
-            self.assertEqual(saved_manifest["output"]["ready_upload"]["row_count"], 2)
+            self.assertEqual(
+                saved_manifest["output"]["status_counts"],
+                {"excluded": 1, "ready": 1, "review": 1},
+            )
+            self.assertEqual(saved_manifest["output"]["ready_upload"]["row_count"], 1)
+            self.assertEqual(
+                saved_manifest["qualification"]["company_contact_sequencing"],
+                {
+                    "eligible_company_groups": 1,
+                    "later_wave_rows": 1,
+                    "multi_contact_companies": 1,
+                },
+            )
             self.assertFalse(saved_manifest["quality"]["evaluated"])
             self.assertEqual(saved_manifest["quality"]["unique_rendered_domains"], 1)
+            self.assertEqual(
+                saved_manifest["script_test"],
+                {
+                    "assignment_field": "personalization_offer_variant",
+                    "cohort_counts": {rows[0]["personalization_offer_variant"]: 1},
+                    "unique_rendered_companies": 1,
+                },
+            )
 
     def test_uses_a_safe_secondary_fact_when_primary_is_website_copy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -601,6 +764,13 @@ class PipelineTests(unittest.TestCase):
                     "max_exact_pitch_share": 0.49,
                 }
             )
+            payload["offer"]["risk_reversal_variants"] = [
+                {
+                    "id": "single-offer-line",
+                    "text": "You only pay when we deliver a qualified conversation.",
+                }
+            ]
+            payload["quality"]["max_offer_line_share"] = 0.49
             for angle in payload["personalization"]["angles"]:
                 angle["templates"] = angle["templates"][:1]
             campaign_path = tmp_path / "campaign.json"
@@ -633,6 +803,12 @@ class PipelineTests(unittest.TestCase):
                 rows = list(csv.DictReader(handle))
             self.assertEqual(manifest["quality"]["unique_rendered_domains"], 2)
             self.assertTrue(manifest["quality"]["evaluated"])
+            self.assertTrue(
+                any(
+                    warning["type"] == "offer_line_share"
+                    for warning in manifest["quality"]["warnings"]
+                )
+            )
             self.assertEqual(manifest["quality"]["flagged_rows"], 3)
             self.assertTrue(all(row["personalization_status"] == "review" for row in rows))
             self.assertTrue(all(row["personalization_quality_flags"] for row in rows))

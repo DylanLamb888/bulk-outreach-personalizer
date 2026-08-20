@@ -33,6 +33,23 @@ class CampaignConfigTests(unittest.TestCase):
                 config = load_campaign(path)
                 self.assertEqual(config.status, "test_only")
 
+    def test_scale_olympus_uses_three_approved_offer_test_versions(self) -> None:
+        config = load_campaign(
+            ROOT / "campaigns" / "examples" / "scale-olympus.json"
+        )
+        self.assertEqual(
+            [variant.variant_id for variant in config.offer_line_variants],
+            ["v1-performance", "v2-done-for-you", "v3-small-upfront"],
+        )
+        self.assertGreater(config.data["quality"]["max_offer_line_share"], 1 / 3)
+        for variant in config.offer_line_variants:
+            with self.subTest(variant=variant.variant_id):
+                self.assertIn("small tech fee", variant.text.casefold())
+                self.assertIn("qualified call", variant.text.casefold())
+                self.assertNotIn("the model is", variant.text.casefold())
+                self.assertNotIn("guarantee", variant.text.casefold())
+                self.assertNotIn("client result", variant.text.casefold())
+
     def test_missing_output_merge_field_is_rejected(self) -> None:
         payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
         payload["email"]["body"] = "Hi {{first_name}}"
@@ -69,6 +86,48 @@ class CampaignConfigTests(unittest.TestCase):
             path = Path(tmp) / "invalid.json"
             path.write_text(json.dumps(payload))
             with self.assertRaisesRegex(CampaignConfigError, "duplicate CTA"):
+                load_campaign(path)
+
+    def test_duplicate_offer_line_variant_id_is_rejected(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["offer"]["risk_reversal_variants"][1]["id"] = (
+            payload["offer"]["risk_reversal_variants"][0]["id"]
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "duplicate offer-line"):
+                load_campaign(path)
+
+    def test_em_dash_in_configured_copy_is_rejected(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["offer"]["risk_reversal_variants"][0]["text"] = (
+            "You pay only for results\u2014not activity."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "em dash"):
+                load_campaign(path)
+
+    def test_offer_line_variants_require_a_default_focus_fallback(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        for variant in payload["offer"]["risk_reversal_variants"]:
+            variant["focus_rules"] = ["one-specific-rule"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "focus-rule fallback"):
+                load_campaign(path)
+
+    def test_cta_variants_require_a_default_focus_fallback(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        for variant in payload["offer"]["cta_variants"]:
+            variant["focus_rules"] = ["one-specific-rule"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "focus-rule fallback"):
                 load_campaign(path)
 
     def test_focus_rules_file_is_required(self) -> None:

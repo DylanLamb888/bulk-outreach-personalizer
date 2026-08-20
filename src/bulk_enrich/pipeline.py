@@ -17,7 +17,14 @@ from typing import Callable, Protocol
 
 from bulk_enrich import __version__
 from bulk_enrich.cache import JsonCache
-from bulk_enrich.config import CampaignConfig, CopyAngle, CopyTemplate, CtaVariant
+from bulk_enrich.config import (
+    CampaignConfig,
+    CopyAngle,
+    CopyTemplate,
+    CtaVariant,
+    OfferLineVariant,
+    forbidden_copy_character,
+)
 from bulk_enrich.csv_io import (
     context_for_row,
     domain_for_row,
@@ -88,6 +95,8 @@ class RenderedCopy:
     body: str
     cta_variant_id: str
     cta: str
+    offer_variant_id: str
+    offer_line: str
 
 
 def sha256_file(path: str | Path) -> str:
@@ -189,6 +198,62 @@ def _balanced_ctas(
     }
 
 
+def _ctas_for_focus_rule(
+    variants: tuple[CtaVariant, ...],
+    focus_rule: str,
+) -> tuple[CtaVariant, ...]:
+    exact = tuple(
+        variant for variant in variants if focus_rule and focus_rule in variant.focus_rules
+    )
+    if exact:
+        return exact
+    fallback = tuple(variant for variant in variants if "*" in variant.focus_rules)
+    if fallback:
+        return fallback
+    raise ValueError(f"no CTA variant is configured for focus rule '{focus_rule}'")
+
+
+def _stable_offer_line(
+    variants: tuple[OfferLineVariant, ...], domain: str
+) -> OfferLineVariant:
+    identity = f"offer-line:{domain}"
+    index = int(hashlib.sha256(identity.encode("utf-8")).hexdigest(), 16) % len(variants)
+    return variants[index]
+
+
+def _balanced_offer_lines(
+    variants: tuple[OfferLineVariant, ...],
+    domains: list[str],
+) -> dict[str, OfferLineVariant]:
+    """Assign approved offer lines evenly and deterministically across one batch."""
+    unique_domains = list(dict.fromkeys(domain for domain in domains if domain))
+    ordered = sorted(
+        unique_domains,
+        key=lambda domain: hashlib.sha256(
+            f"offer-line-balance:{domain}".encode("utf-8")
+        ).hexdigest(),
+    )
+    return {
+        domain: variants[index % len(variants)]
+        for index, domain in enumerate(ordered)
+    }
+
+
+def _offer_lines_for_focus_rule(
+    variants: tuple[OfferLineVariant, ...],
+    focus_rule: str,
+) -> tuple[OfferLineVariant, ...]:
+    exact = tuple(
+        variant for variant in variants if focus_rule and focus_rule in variant.focus_rules
+    )
+    if exact:
+        return exact
+    fallback = tuple(variant for variant in variants if "*" in variant.focus_rules)
+    if fallback:
+        return fallback
+    raise ValueError(f"no offer-line variant is configured for focus rule '{focus_rule}'")
+
+
 def _angle_for_signal(campaign: CampaignConfig, signal_type: str) -> CopyAngle:
     fallback: CopyAngle | None = None
     for angle in campaign.angles:
@@ -211,11 +276,21 @@ def _build_copy(
     domain: str,
     signal_type: str,
     source_evidence: str,
+    focus_rule: str = "",
     cta_variant: CtaVariant | None = None,
+    offer_variant: OfferLineVariant | None = None,
 ) -> RenderedCopy:
     angle = _angle_for_signal(campaign, signal_type)
     failures: list[str] = []
-    cta_variant = cta_variant or _stable_cta(campaign.cta_variants, domain)
+    applicable_ctas = _ctas_for_focus_rule(campaign.cta_variants, focus_rule)
+    if cta_variant not in applicable_ctas:
+        cta_variant = _stable_cta(applicable_ctas, domain)
+    applicable_offer_lines = _offer_lines_for_focus_rule(
+        campaign.offer_line_variants,
+        focus_rule,
+    )
+    if offer_variant not in applicable_offer_lines:
+        offer_variant = _stable_offer_line(applicable_offer_lines, domain)
     try:
         cta = " ".join(render_template(cta_variant.text, context).strip().split())
     except KeyError as exc:
@@ -229,8 +304,37 @@ def _build_copy(
         raise ValueError(
             f"CTA {cta_variant.variant_id} contains banned phrase '{banned_cta}'"
         )
+    forbidden_cta = forbidden_copy_character(cta)
+    if forbidden_cta:
+        raise ValueError(
+            f"CTA {cta_variant.variant_id} contains forbidden character: {forbidden_cta}"
+        )
+    try:
+        offer_line = " ".join(
+            render_template(offer_variant.text, context).strip().split()
+        )
+    except KeyError as exc:
+        raise ValueError(f"offer line {offer_variant.variant_id}: {exc}") from exc
+    if offer_line and word_count(offer_line) > campaign.max_offer_line_words:
+        raise ValueError(
+            f"offer line {offer_variant.variant_id} exceeds "
+            f"{campaign.max_offer_line_words} words"
+        )
+    banned_offer_line = _banned_phrase(offer_line, campaign.banned_phrases)
+    if banned_offer_line:
+        raise ValueError(
+            f"offer line {offer_variant.variant_id} contains banned phrase "
+            f"'{banned_offer_line}'"
+        )
+    forbidden_offer_line = forbidden_copy_character(offer_line)
+    if forbidden_offer_line:
+        raise ValueError(
+            f"offer line {offer_variant.variant_id} contains forbidden character: "
+            f"{forbidden_offer_line}"
+        )
     render_context = dict(context)
     render_context["cta"] = cta
+    render_context["risk_reversal"] = offer_line
     for template in _stable_template_order(angle.templates, domain):
         try:
             pitch = " ".join(render_template(template.pitch, context).strip().split())
@@ -277,6 +381,13 @@ def _build_copy(
                 f"{template.template_id}: rendered copy contains banned phrase '{banned}'"
             )
             continue
+        forbidden_character = forbidden_copy_character("\n".join((subject, body)))
+        if forbidden_character:
+            failures.append(
+                f"{template.template_id}: rendered copy contains forbidden character: "
+                f"{forbidden_character}"
+            )
+            continue
         return RenderedCopy(
             angle_id=angle.angle_id,
             template_id=template.template_id,
@@ -285,6 +396,8 @@ def _build_copy(
             body=body,
             cta_variant_id=cta_variant.variant_id,
             cta=cta,
+            offer_variant_id=offer_variant.variant_id,
+            offer_line=offer_line,
         )
     raise ValueError("no safe copy template rendered: " + "; ".join(failures))
 
@@ -406,6 +519,8 @@ _COPY_OUTPUT_FIELDS = (
     "personalization_template",
     "personalization_cta_variant",
     "personalization_cta",
+    "personalization_offer_variant",
+    "personalization_offer_line",
 )
 
 
@@ -430,6 +545,17 @@ def _refresh_outreach_status(row: dict[str, str]) -> None:
         _result_from_row(row, "email"),
         row.get("personalization_status", "error"),
     )
+    if (
+        row.get("company_contact_status") == "later-wave"
+        and status in {"ready", "review"}
+    ):
+        status = "review"
+        sequencing_reason = row.get(
+            "company_contact_reason",
+            "additional eligible contact at the same company",
+        )
+        if sequencing_reason and sequencing_reason not in reason:
+            reason = f"{reason}; sequencing: {sequencing_reason}"
     row["outreach_status"] = status
     row["outreach_reason"] = reason
 
@@ -473,6 +599,90 @@ def _deduplicate_emails(
             _blank_rendered_copy(row, campaign)
             _refresh_outreach_status(row)
     return duplicate_rows
+
+
+def _seniority_rank(value: str, campaign: CampaignConfig) -> int:
+    normalized = value.strip().casefold()
+    ordered = (*campaign.ready_seniorities, *campaign.review_seniorities)
+    for index, configured in enumerate(ordered):
+        if normalized == configured.casefold():
+            return len(ordered) - index
+    return 0
+
+
+def _title_priority_rank(value: str, campaign: CampaignConfig) -> int:
+    for index, pattern in enumerate(campaign.contact_priority_patterns):
+        if re.search(pattern, value, re.I):
+            return len(campaign.contact_priority_patterns) - index
+    return 0
+
+
+def _sequence_company_contacts(
+    rows: list[dict[str, str]],
+    domains: list[str],
+    campaign: CampaignConfig,
+    *,
+    seniority_header: str,
+    title_header: str,
+) -> dict[str, int]:
+    """Keep one strongest contact per company ready and hold the rest for later waves."""
+    grouped: dict[str, list[int]] = {}
+    for index, (row, domain) in enumerate(zip(rows, domains, strict=True)):
+        row["company_contact_status"] = "not-eligible"
+        row["company_contact_rank"] = ""
+        row["company_contact_count"] = ""
+        row["company_contact_reason"] = "row is not eligible for contact sequencing"
+        if (
+            domain
+            and row.get("outreach_status") in {"ready", "review"}
+            and row.get("personalized_email")
+        ):
+            grouped.setdefault(domain, []).append(index)
+
+    outreach_rank = {"ready": 2, "review": 1}
+    fit_rank = {"qualified": 2, "review": 1, "excluded": 0}
+    copy_rank = {"ready": 2, "review": 1, "blank": 0, "error": -1}
+    later_wave_rows = 0
+    multi_contact_companies = 0
+    for indexes in grouped.values():
+        if len(indexes) > 1:
+            multi_contact_companies += 1
+        ranked = sorted(
+            indexes,
+            key=lambda index: (
+                -outreach_rank.get(rows[index].get("outreach_status", "review"), 0),
+                -fit_rank.get(rows[index].get("contact_fit_status", "excluded"), 0),
+                -fit_rank.get(rows[index].get("email_fit_status", "excluded"), 0),
+                -fit_rank.get(rows[index].get("company_fit_status", "excluded"), 0),
+                -copy_rank.get(rows[index].get("personalization_status", "error"), -1),
+                -_title_priority_rank(rows[index].get(title_header, ""), campaign),
+                -_seniority_rank(rows[index].get(seniority_header, ""), campaign),
+                index,
+            ),
+        )
+        contact_count = len(ranked)
+        for rank, index in enumerate(ranked, start=1):
+            row = rows[index]
+            row["company_contact_rank"] = str(rank)
+            row["company_contact_count"] = str(contact_count)
+            if rank == 1:
+                row["company_contact_status"] = "primary"
+                row["company_contact_reason"] = (
+                    "highest-ranked eligible contact for this company"
+                )
+            else:
+                later_wave_rows += 1
+                row["company_contact_status"] = "later-wave"
+                row["company_contact_reason"] = (
+                    f"additional eligible contact at the same company; hold for wave {rank}"
+                )
+            _refresh_outreach_status(row)
+
+    return {
+        "eligible_company_groups": len(grouped),
+        "multi_contact_companies": multi_contact_companies,
+        "later_wave_rows": later_wave_rows,
+    }
 
 
 def _clean_first_name(value: str) -> str:
@@ -545,6 +755,7 @@ def _apply_batch_quality(
     exact_domains: dict[str, set[str]] = {}
     buyer_phrase_domains: dict[str, set[str]] = {}
     cta_domains: dict[str, set[str]] = {}
+    offer_line_domains: dict[str, set[str]] = {}
     for domain, row in representatives.items():
         pitch = row[campaign.output_field]
         opening = _opening_key(pitch, int(quality["opening_words"]))
@@ -556,6 +767,9 @@ def _apply_batch_quality(
         cta = row.get("personalization_cta", "").casefold()
         if cta:
             cta_domains.setdefault(cta, set()).add(domain)
+        offer_line = row.get("personalization_offer_line", "").casefold()
+        if offer_line:
+            offer_line_domains.setdefault(offer_line, set()).add(domain)
 
     flags_by_domain: dict[str, list[str]] = {}
     warnings: list[dict[str, object]] = []
@@ -609,6 +823,23 @@ def _apply_batch_quality(
                 {
                     "type": "cta_share",
                     "cta": cta,
+                    "count": len(affected),
+                    "share": round(share, 4),
+                }
+            )
+            for domain in affected:
+                flags_by_domain.setdefault(domain, []).append(message)
+
+    for offer_line, affected in sorted(offer_line_domains.items()):
+        share = len(affected) / total
+        if share > float(quality["max_offer_line_share"]):
+            message = (
+                f"offer line '{offer_line}' appears on {share:.1%} of rendered domains"
+            )
+            warnings.append(
+                {
+                    "type": "offer_line_share",
+                    "offer_line": offer_line,
                     "count": len(affected),
                     "share": round(share, 4),
                 }
@@ -757,7 +988,10 @@ def run_enrichment(
     )
 
     append_fields = list(campaign.data["output"]["append_fields"])
-    cta_by_domain = _balanced_ctas(campaign.cta_variants, unique_domains)
+    cta_by_domain = _balanced_ctas(campaign.default_cta_variants, unique_domains)
+    offer_line_by_domain = _balanced_offer_lines(
+        campaign.default_offer_line_variants, unique_domains
+    )
     output_rows: list[dict[str, str]] = []
     for row, domain in zip(data.rows, domains, strict=True):
         output_row = dict(row)
@@ -794,6 +1028,8 @@ def run_enrichment(
             "personalization_focus_rule": "",
             "personalization_cta_variant": "",
             "personalization_cta": "",
+            "personalization_offer_variant": "",
+            "personalization_offer_line": "",
             "personalization_facts": "",
             "personalization_source": signal.source_url if signal else "",
             "personalization_evidence": signal.evidence if signal else "",
@@ -813,6 +1049,10 @@ def run_enrichment(
             "email_fit_status": email_result.status,
             "email_fit_rule": email_result.rule,
             "email_fit_reason": email_result.reason,
+            "company_contact_status": "not-eligible",
+            "company_contact_rank": "",
+            "company_contact_count": "",
+            "company_contact_reason": "row is not eligible for contact sequencing",
             "outreach_status": "excluded",
             "outreach_reason": "",
         }
@@ -971,7 +1211,9 @@ def run_enrichment(
                     domain,
                     fact.signal_type,
                     fact.evidence,
+                    focus_rule=commercial_focus.rule_id,
                     cta_variant=cta_by_domain.get(domain),
+                    offer_variant=offer_line_by_domain.get(domain),
                 )
                 values["personalized_subject"] = rendered.subject
                 values[campaign.output_field] = rendered.pitch
@@ -980,6 +1222,8 @@ def run_enrichment(
                 values["personalization_template"] = rendered.template_id
                 values["personalization_cta_variant"] = rendered.cta_variant_id
                 values["personalization_cta"] = rendered.cta
+                values["personalization_offer_variant"] = rendered.offer_variant_id
+                values["personalization_offer_line"] = rendered.offer_line
                 values["personalization_status"] = "review" if low_confidence else "ready"
             except (KeyError, ValueError) as exc:
                 values["personalization_status"] = "error"
@@ -1000,6 +1244,13 @@ def run_enrichment(
     quality_report = _apply_batch_quality(output_rows, domains, campaign)
     for row in output_rows:
         _refresh_outreach_status(row)
+    sequencing_report = _sequence_company_contacts(
+        output_rows,
+        domains,
+        campaign,
+        seniority_header=data.column_map.get("job_seniority", ""),
+        title_header=data.column_map.get("job_title", ""),
+    )
     personalization_status_counts = Counter(
         row.get("personalization_status", "error") for row in output_rows
     )
@@ -1049,6 +1300,18 @@ def run_enrichment(
     email_fit_counts = Counter(row["email_fit_status"] for row in output_rows)
     company_rule_counts = Counter(
         row["company_fit_rule"] for row in output_rows if row["company_fit_rule"]
+    )
+    rendered_company_rows: dict[str, dict[str, str]] = {}
+    for row, domain in zip(output_rows, domains, strict=True):
+        if (
+            domain
+            and row.get("personalization_offer_variant")
+            and row.get("personalization_status") in {"ready", "review"}
+        ):
+            rendered_company_rows.setdefault(domain, row)
+    offer_test_counts = Counter(
+        row["personalization_offer_variant"]
+        for row in rendered_company_rows.values()
     )
     manifest: dict[str, object] = {
         "tool": {"name": "bulk-enrich", "version": __version__},
@@ -1115,6 +1378,12 @@ def run_enrichment(
             "outreach_status_counts": dict(sorted(outreach_status_counts.items())),
             "company_rule_counts": dict(sorted(company_rule_counts.items())),
             "duplicate_email_rows_excluded": duplicate_email_rows,
+            "company_contact_sequencing": sequencing_report,
+        },
+        "script_test": {
+            "assignment_field": "personalization_offer_variant",
+            "cohort_counts": dict(sorted(offer_test_counts.items())),
+            "unique_rendered_companies": len(rendered_company_rows),
         },
         "quality": quality_report,
         "settings": {

@@ -44,6 +44,12 @@
       "fallback_fields": ["Company description", "Company keywords", "Company industry"]
     },
     "contact": {
+      "priority_title_patterns": [
+        "\\b(?:owner|co-owner|founder|co-founder|founding partner|managing partner)\\b",
+        "\\b(?:chief executive officer|ceo|president|partner)\\b",
+        "\\b(?:managing director|principal)\\b",
+        "\\b(?:vice president|vp|director|head of)\\b"
+      ],
       "ready_title_patterns": [
         "\\b(?:owner|co-owner|founder|co-founder|chief executive officer|ceo|president|managing partner|managing director|partner|principal|managing member)\\b"
       ],
@@ -128,11 +134,13 @@
     "max_buyer_phrase_words": 8,
     "max_source_phrase_words": 5,
     "max_cta_words": 12,
+    "max_offer_line_words": 24,
     "opening_words": 4,
     "max_opening_share": 0.45,
     "max_exact_pitch_share": 0.1,
     "max_buyer_phrase_share": null,
     "max_cta_share": 0.3,
+    "max_offer_line_share": 1.0,
     "min_rows": 20,
     "repetition_action": "review"
   },
@@ -150,6 +158,8 @@
       "personalization_focus_rule",
       "personalization_cta_variant",
       "personalization_cta",
+      "personalization_offer_variant",
+      "personalization_offer_line",
       "personalization_facts",
       "personalization_source",
       "personalization_evidence",
@@ -169,6 +179,10 @@
       "email_fit_status",
       "email_fit_rule",
       "email_fit_reason",
+      "company_contact_status",
+      "company_contact_rank",
+      "company_contact_count",
+      "company_contact_reason",
       "outreach_status",
       "outreach_reason"
     ]

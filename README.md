@@ -20,14 +20,18 @@ The engine fetches each unique public company domain once, caches the result, ex
 - campaign-specific title, seniority, and email-status qualification;
 - two-field corroboration for CSV-only company evidence;
 - deterministic duplicate-email resolution;
+- deterministic company-contact ranking with one upload-ready contact per company and later contacts held for review;
 - fail-closed rejection of slogans, testimonials, company-name fragments, incomplete clauses, service stacks, years, promotional adjectives, and “& more” language;
 - signal-routed subject and pitch templates;
-- campaign-approved CTA variants selected independently and deterministically;
-- even deterministic CTA distribution across each batch;
+- campaign-approved offer-line and CTA variants selected independently and deterministically;
+- focus-rule-specific offer lines for distinct buyer types, with a required campaign fallback;
+- focus-rule-specific CTAs with concrete numbered assets where the sender can fulfil them;
+- even deterministic offer-line and CTA distribution across each batch;
 - conversational greeting and subject-safe company-name cleanup;
 - review-only CSV fallbacks used only when first-party evidence is unavailable and two approved fields agree;
 - campaign-level banned phrases, word limits, and source-copy overlap limits;
-- batch repetition QA for openings, exact pitches, buyer phrases, and CTAs across unique domains;
+- batch repetition QA for openings, exact pitches, buyer phrases, offer lines, and CTAs across unique domains;
+- a hard copy gate that rejects em dashes from configured or rendered outreach;
 - editable title-to-hook rules;
 - separate copy status and final `ready`, `review`, `excluded`, or `error` outreach status;
 - atomic CSV output and a checksummed run manifest;
@@ -47,7 +51,7 @@ This creates symlinks under `~/.codex/skills/` and `~/.claude/skills/`. It is id
 
 ## 2. Create a campaign
 
-Copy `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`, rename both, and update `personalization.focus_rules_file` to the adjacent CSV filename. Replace the offer, qualification policy, copy angles, CTA variants, sender, and market-specific focus rules. Label every focus rule `core`, `secondary`, or `exclude`, and keep the campaign `test_only` until its rules and copy are reviewed.
+Copy `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`, rename both, and update `personalization.focus_rules_file` to the adjacent CSV filename. Replace the offer, qualification policy, copy angles, offer-line variants, CTA variants, sender, and market-specific focus rules. Label every focus rule `core`, `secondary`, or `exclude`, and keep the campaign `test_only` until its rules and copy are reviewed.
 
 The Python engine contains no M&A, CFO, recruitment, or client-specific mapping. Those rules live only in the focus CSV declared by each campaign JSON. `--focus-rules` remains available as an explicit one-run override.
 
@@ -113,7 +117,7 @@ Firecrawl results have their own successful and negative local caches. The manif
 
 ## Quality gate
 
-Upload only rows with `outreach_status=ready`. Inspect `review` rows before use. Excluded rows intentionally contain no send-ready personalization. For batches above the configured minimum size, repeated openings, exact pitches, or CTAs can move affected rows to review; buyer-phrase concentration can be disabled for a deliberately narrow segment.
+Upload only rows with `outreach_status=ready`. Inspect `review` rows before use. Excluded rows intentionally contain no send-ready personalization. When several eligible contacts share a company domain, only the strongest contact remains ready and later contacts are ranked for later waves. For batches above the configured minimum size, repeated openings, exact pitches, offer lines, or CTAs can move affected rows to review; buyer-phrase concentration can be disabled for a deliberately narrow segment.
 
 ```bash
 env PYTHONPATH=src python3 -B -m unittest discover -s tests -v
