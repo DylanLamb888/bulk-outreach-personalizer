@@ -19,7 +19,7 @@ from bulk_enrich.fetcher import HttpFetcher
 from bulk_enrich.models import CompanyFact, FetchResult, SiteSignal
 
 
-SIGNAL_ENGINE_VERSION = "7"
+SIGNAL_ENGINE_VERSION = "8"
 
 
 _GENERIC_BRAND_SUFFIXES = (
@@ -134,8 +134,10 @@ class SiteEnricher:
         home, home_page, candidates = self._prefer_rendered_page(home)
         pages.append((home, home_page))
 
-        best_confidence = candidates[0].score if candidates else 0.0
-        if best_confidence < 0.86 and self.max_pages > 1:
+        # A polished homepage description is not enough evidence on its own.
+        # When the campaign allows another page, inspect the strongest first-party
+        # detail page even if homepage metadata scored well.
+        if self.max_pages > 1:
             links = discover_internal_links(
                 home_page,
                 home.final_url,
@@ -166,7 +168,22 @@ class SiteEnricher:
 
         facts: list[CompanyFact] = []
         seen_focuses: set[str] = set()
-        for candidate in candidates:
+        # Metadata is concise and therefore scores well, but three near-identical
+        # metadata snippets can otherwise crowd out the substantive body copy that
+        # explains what a company actually does. Preserve the top-ranked candidate
+        # and, where available, one body paragraph before filling remaining slots.
+        fact_candidates: list[TextCandidate] = [candidates[0]]
+        best_paragraph = next(
+            (candidate for candidate in candidates if candidate.kind == "paragraph"),
+            None,
+        )
+        if best_paragraph is not None and best_paragraph != candidates[0]:
+            fact_candidates.append(best_paragraph)
+        fact_candidates.extend(
+            candidate for candidate in candidates if candidate not in fact_candidates
+        )
+
+        for candidate in fact_candidates:
             normalized = normalize_company_signal(candidate.text)
             identity = normalized.focus.casefold()
             if not normalized.focus or identity in seen_focuses:

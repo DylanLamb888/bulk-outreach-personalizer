@@ -9,46 +9,46 @@
   "offer": {
     "service": "A done-for-you cold email system that books qualified sales calls with B2B decision-makers.",
     "audience": "Owners and commercial leaders at B2B service companies.",
-    "risk_reversal": "You pay a small tech fee upfront, then a fee for each qualified call.",
+    "risk_reversal": "We'd handle the outreach. There's a small tech fee to launch, then you pay per qualified call.",
     "risk_reversal_variants": [
       {
         "id": "v1-performance",
-        "text": "You pay a small tech fee upfront, then a fee for each qualified call."
+        "text": "We'd handle the outreach. There's a small tech fee to launch, then you pay per qualified call."
       },
       {
         "id": "v2-done-for-you",
-        "text": "We handle the lists, outreach and replies for a small tech fee, then charge per qualified call."
+        "text": "We build lists, run outreach and qualify replies. You pay a small tech fee to launch, then a fee per qualified call."
       },
       {
         "id": "v3-small-upfront",
-        "text": "We charge a small tech fee to get started, then you pay for the qualified calls we deliver."
+        "text": "A small tech fee gets the campaign live. After that, you only pay for qualified calls."
       }
     ],
-    "cta": "Want me to send the 3 buyer segments I'd test?",
+    "cta": "I can send over a 25-company sample list for you. Useful?",
     "cta_variants": [
       {
-        "id": "send-buyer-segments",
-        "text": "Want me to send the 3 buyer segments I'd test?"
+        "id": "send-25-sample",
+        "text": "I can send over a 25-company sample list for you. Useful?"
       },
       {
-        "id": "send-audience-messaging",
-        "text": "Should I send over the 2 message angles I'd test first?"
+        "id": "build-25-profile",
+        "text": "Want me to build a list of 25 companies matching that profile?"
       },
       {
-        "id": "show-list-criteria",
-        "text": "Open to seeing the 5 list criteria I'd use?"
+        "id": "send-first-25",
+        "text": "Should I send over the first 25 companies I'd target?"
       },
       {
-        "id": "send-example-campaign",
-        "text": "Want me to send over a 3-email example campaign?"
+        "id": "map-first-25",
+        "text": "I can map 25 companies I'd start with. Want the list?"
       },
       {
-        "id": "send-first-list",
-        "text": "Should I send over a 20-account sample list?"
+        "id": "tailored-25-list",
+        "text": "Would a tailored list of 25 companies be useful?"
       },
       {
-        "id": "show-target-companies",
-        "text": "Open to seeing the first 10 companies I'd target?"
+        "id": "show-first-25",
+        "text": "Open to seeing the first 25 companies I'd approach for you?"
       }
     ],
     "approved_claims": [
@@ -67,12 +67,12 @@
     "contact": {
       "priority_title_patterns": [
         "\\b(?:owner|co-owner|founder|co-founder|founding partner|managing partner)\\b",
-        "\\b(?:chief executive officer|ceo|president|partner)\\b",
+        "\\b(?:chief executive officer|ceo|(?<!vice )president|partner)\\b",
         "\\b(?:managing director|principal)\\b",
         "\\b(?:vice president|vp|director|head of)\\b"
       ],
       "ready_title_patterns": [
-        "\\b(?:owner|co-owner|founder|co-founder|chief executive officer|ceo|president|managing partner|managing director|partner|principal|managing member)\\b"
+        "\\b(?:owner|co-owner|founder|co-founder|chief executive officer|ceo|(?<!vice )president|managing partner|managing director|partner|principal|managing member)\\b"
       ],
       "review_title_patterns": [
         "\\b(?:vice president|vp|director|head of|business development|sales director|commercial director)\\b"
@@ -80,8 +80,8 @@
       "exclude_title_patterns": [
         "\\b(?:assistant|associate|analyst|intern|student|coordinator|co-ordinator|specialist)\\b"
       ],
-      "ready_seniorities": ["C-Suite", "Founder/Owner", "Partner", "Director"],
-      "review_seniorities": ["Vice President", "Head"]
+      "ready_seniorities": ["C-Suite", "Founder/Owner", "Partner", "Director", "Vice President"],
+      "review_seniorities": ["Head"]
     },
     "email": {
       "accepted_statuses": ["verified", "valid"],
@@ -131,43 +131,43 @@
         "templates": [
           {
             "id": "buyer-speak",
-            "subject": "{{company_short_name}} buyers",
-            "pitch": "Open to speaking with more {{buyer_phrase}}?"
-          },
-          {
-            "id": "focused-reach",
-            "subject": "{{company_short_name}} outreach",
-            "pitch": "Could a campaign start more conversations with {{buyer_phrase}}?"
-          },
-          {
-            "id": "useful-reach",
-            "subject": "Buyer angles for {{company_short_name}}",
-            "pitch": "Would it be useful to reach more {{buyer_phrase}}?"
-          },
-          {
-            "id": "conversation-question",
-            "subject": "{{company_short_name}} buyer angles",
+            "subject": "Buyer conversations",
             "pitch": "Would more conversations with {{buyer_phrase}} be useful?"
           },
           {
+            "id": "focused-reach",
+            "subject": "25 target companies",
+            "pitch": "Are you looking to speak with more {{buyer_phrase}}?"
+          },
+          {
+            "id": "useful-reach",
+            "subject": "Outbound idea",
+            "pitch": "Would speaking with more {{buyer_phrase}} help?"
+          },
+          {
+            "id": "conversation-question",
+            "subject": "New conversations",
+            "pitch": "Is reaching more {{buyer_phrase}} useful right now?"
+          },
+          {
             "id": "direct-help",
-            "subject": "{{company_short_name}} outreach idea",
-            "pitch": "Could we help you reach more {{buyer_phrase}}?"
+            "subject": "Target account list",
+            "pitch": "Are more conversations with {{buyer_phrase}} a priority?"
           },
           {
             "id": "campaign-audience",
-            "subject": "Audience for {{company_short_name}}",
-            "pitch": "Open to a campaign aimed at {{buyer_phrase}}?"
+            "subject": "A quick idea",
+            "pitch": "Would it help to reach more {{buyer_phrase}}?"
           },
           {
             "id": "priority-question",
-            "subject": "{{company_short_name}} pipeline",
-            "pitch": "Is speaking with more {{buyer_phrase}} a priority?"
+            "subject": "More buyer conversations",
+            "pitch": "Do you want more conversations with {{buyer_phrase}}?"
           },
           {
             "id": "simple-reach",
-            "subject": "{{company_short_name}} lead idea",
-            "pitch": "Could outreach to {{buyer_phrase}} be useful?"
+            "subject": "A list idea",
+            "pitch": "Is it worth reaching more {{buyer_phrase}}?"
           }
         ]
       }
@@ -179,9 +179,9 @@
   },
   "quality": {
     "max_body_words": 55,
-    "max_subject_words": 7,
+    "max_subject_words": 5,
     "max_focus_words": 7,
-    "max_buyer_phrase_words": 8,
+    "max_buyer_phrase_words": 7,
     "max_source_phrase_words": 5,
     "max_cta_words": 12,
     "max_offer_line_words": 24,

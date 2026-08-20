@@ -28,7 +28,7 @@ class RendererTests(unittest.TestCase):
         self.assertEqual(subject, "Northstar Finance outreach")
         self.assertIn("Could outbound", body)
         self.assertIn("small tech fee", body)
-        self.assertIn("fee for each qualified call", body)
+        self.assertIn("qualified call", body)
         self.assertIn("Should I send the audience I'd start with?", body)
         self.assertTrue(body.endswith("Dylan"))
 

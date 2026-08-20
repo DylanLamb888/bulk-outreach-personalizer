@@ -6,7 +6,7 @@ Use website facts inside the commercial question or offer. Do not lead with a se
 
 - Keep the email short enough to scan in seconds; set explicit subject, pitch, and body limits in campaign JSON.
 - Preserve the full website phrase in `personalization_source_focus`, but write from one compressed commercial category.
-- Try the site's other extracted facts when the first snippet is a slogan, testimonial, company name, or incomplete clause; do not force the first fact into copy.
+- Try the site's other extracted facts when the first snippet is generic metadata, a slogan, testimonial, company name, or incomplete clause; do not force the first fact into copy. Preserve at least one substantive body fact when available.
 - Use `{{buyer_phrase}}` when the offer depends on reaching prospective buyers; use `{{company_focus}}` when the offer genuinely needs the category itself.
 - Keep a focus to roughly seven words and a pitch to roughly 8–14 words.
 - Prefer concrete people and actions over abstract labels. For example, use "companies looking to sell a division" instead of "corporate teams considering a carve-out".
@@ -35,6 +35,6 @@ Use website facts inside the commercial question or offer. Do not lead with a se
 
 ## Batch gate
 
-The engine measures opening, exact-pitch, buyer-phrase, offer-line, and CTA frequency across unique domains after rendering. Duplicate contacts at the same company count once. Above the configured minimum batch size, excessive repetition is written to `personalization_quality_flags` and can move affected rows from `ready` to `review`.
+The engine measures opening, exact-pitch, buyer-phrase, offer-line, and CTA frequency across unique domains after rendering. Duplicate contacts at the same company count once. CTA and offer-line variants are balanced only across rendered companies and within each applicable focus-rule pool, so excluded domains cannot skew the distribution. The exact-pitch gate respects the lowest concentration mathematically possible from the approved template count. Above the configured minimum batch size, genuine excessive repetition is written to `personalization_quality_flags` and can move affected rows from `ready` to `review`.
 
 Review the manifest's `quality` object before uploading the ready-only CSV.

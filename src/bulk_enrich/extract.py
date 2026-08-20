@@ -41,7 +41,8 @@ _PROMOTIONAL_PHRASES = (
 _BUSINESS_VERBS = re.compile(
     r"\b(help|helps|support|supports|provide|provides|offer|offers|speciali[sz]e|"
     r"speciali[sz]es|advise|advises|manage|manages|build|builds|deliver|delivers|"
-    r"serve|serves|work with|works with|enable|enables)\b",
+    r"serve|serves|work with|works with|enable|enables|acquire|acquires|acquiring|"
+    r"buy|buys|buying|invest|invests|investing)\b",
     re.IGNORECASE,
 )
 _METRIC_CLAIM_RE = re.compile(

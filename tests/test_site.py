@@ -40,7 +40,59 @@ class FakeFetcher:
         )
 
 
+class RoutingFetcher:
+    def __init__(self, pages: dict[str, str]) -> None:
+        self.pages = pages
+        self.calls: list[str] = []
+
+    def fetch(self, url: str) -> FetchResult:
+        self.calls.append(url)
+        body = self.pages.get(url, "")
+        return FetchResult(
+            url=url,
+            final_url=url,
+            status_code=200 if body else 404,
+            content_type="text/html",
+            body=body,
+            fetched_at=datetime.now(UTC).isoformat(),
+            error="" if body else "HTTP 404",
+            provider="http",
+        )
+
+
 class SiteEnricherTests(unittest.TestCase):
+    def test_retains_substantive_detail_page_evidence_when_homepage_metadata_is_generic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = """
+                <html><head><meta name="description" content="A leading private equity firm focused on fostering industry leaders."></head>
+                <body><a href="/about">About</a></body></html>
+            """
+            about = """
+                <html><head><meta name="description" content="A leading private equity firm focused on fostering industry leaders."></head>
+                <body><p>We focus on acquiring private companies and partner with owners seeking a pathway to an exit transaction.</p></body></html>
+            """
+            fetcher = RoutingFetcher(
+                {
+                    "https://darkalpha.example/": home,
+                    "https://darkalpha.example/about": about,
+                }
+            )
+            enricher = SiteEnricher(
+                fetcher,  # type: ignore[arg-type]
+                JsonCache(Path(tmp)),
+                max_pages=2,
+            )
+
+            signal = enricher.enrich("darkalpha.example")
+
+            self.assertEqual(
+                fetcher.calls,
+                ["https://darkalpha.example/", "https://darkalpha.example/about"],
+            )
+            self.assertTrue(
+                any("acquiring private companies" in fact.evidence for fact in signal.facts)
+            )
+
     def test_extracts_once_then_uses_signal_cache(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fetcher = FakeFetcher((ROOT / "tests" / "fixtures" / "site.html").read_text())

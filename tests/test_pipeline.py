@@ -7,14 +7,17 @@ from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
-from bulk_enrich.config import OfferLineVariant, load_campaign
+from bulk_enrich.config import CtaVariant, OfferLineVariant, load_campaign
 from bulk_enrich.focus import CommercialFocusResult, CommercialFocusTable
 from bulk_enrich.hooks import TitleHookTable
 from bulk_enrich.models import CompanyFact, SiteSignal
 from bulk_enrich.pipeline import (
     RunOptions,
+    _apply_batch_quality,
     _balanced_ctas,
+    _balanced_ctas_for_rendered_domains,
     _balanced_offer_lines,
+    _balanced_offer_lines_for_rendered_domains,
     _build_copy,
     _clean_first_name,
     _immutable_snapshot,
@@ -376,7 +379,7 @@ class PipelineTests(unittest.TestCase):
         open_cta = next(
             item
             for item in campaign.cta_variants
-            if item.variant_id == "show-list-criteria"
+            if item.variant_id == "show-first-25"
         )
         for index in range(20):
             rendered = _build_copy(
@@ -414,6 +417,98 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(first, second)
         counts = Counter(item.variant_id for item in first.values())
         self.assertLessEqual(max(counts.values()) - min(counts.values()), 1)
+
+    def test_rendered_domain_variants_balance_within_focus_pools(self) -> None:
+        ctas = (
+            CtaVariant("general-one", "General one."),
+            CtaVariant("general-two", "General two."),
+            CtaVariant("general-three", "General three."),
+            CtaVariant("special-one", "Special one.", ("special",)),
+            CtaVariant("special-two", "Special two.", ("special",)),
+        )
+        offer_lines = (
+            OfferLineVariant("offer-one", "Offer one."),
+            OfferLineVariant("offer-two", "Offer two."),
+            OfferLineVariant("special-offer", "Special offer.", ("special",)),
+        )
+        domain_focus_rules = [
+            *((f"general-{index}.example", "general") for index in range(11)),
+            *((f"special-{index}.example", "special") for index in range(3)),
+        ]
+
+        cta_assignment = _balanced_ctas_for_rendered_domains(
+            ctas, domain_focus_rules
+        )
+        repeated_cta_assignment = _balanced_ctas_for_rendered_domains(
+            ctas, list(reversed(domain_focus_rules))
+        )
+        self.assertEqual(cta_assignment, repeated_cta_assignment)
+        general_cta_counts = Counter(
+            cta_assignment[domain].variant_id
+            for domain, focus_rule in domain_focus_rules
+            if focus_rule == "general"
+        )
+        special_cta_counts = Counter(
+            cta_assignment[domain].variant_id
+            for domain, focus_rule in domain_focus_rules
+            if focus_rule == "special"
+        )
+        self.assertLessEqual(
+            max(general_cta_counts.values()) - min(general_cta_counts.values()), 1
+        )
+        self.assertLessEqual(
+            max(special_cta_counts.values()) - min(special_cta_counts.values()), 1
+        )
+
+        offer_assignment = _balanced_offer_lines_for_rendered_domains(
+            offer_lines, domain_focus_rules
+        )
+        general_offer_counts = Counter(
+            offer_assignment[domain].variant_id
+            for domain, focus_rule in domain_focus_rules
+            if focus_rule == "general"
+        )
+        self.assertLessEqual(
+            max(general_offer_counts.values()) - min(general_offer_counts.values()), 1
+        )
+        self.assertTrue(
+            all(
+                offer_assignment[domain].variant_id == "special-offer"
+                for domain, focus_rule in domain_focus_rules
+                if focus_rule == "special"
+            )
+        )
+
+    def test_exact_pitch_gate_allows_the_balanced_template_floor(self) -> None:
+        campaign = load_campaign(
+            ROOT / "campaigns" / "examples" / "scale-olympus.json"
+        )
+        rows = []
+        domains = []
+        for index in range(28):
+            domains.append(f"company-{index}.example")
+            rows.append(
+                {
+                    "personalization_status": "ready",
+                    "personalized_pitch": f"Approved pitch {index % 8}",
+                    "personalization_angle": "buyer-conversation-angle",
+                    "personalization_buyer_phrase": "qualified buyers",
+                    "personalization_cta": f"CTA {index}",
+                    "personalization_offer_line": (
+                        f"Approved offer line {index % 3}"
+                    ),
+                    "personalization_quality_flags": "",
+                }
+            )
+
+        report = _apply_batch_quality(rows, domains, campaign)
+
+        self.assertFalse(
+            any(
+                warning["type"] == "exact_pitch_share"
+                for warning in report["warnings"]
+            )
+        )
 
     def test_offer_line_selection_prefers_an_exact_focus_rule(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

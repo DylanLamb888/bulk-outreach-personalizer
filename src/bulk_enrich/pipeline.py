@@ -99,6 +99,16 @@ class RenderedCopy:
     offer_line: str
 
 
+@dataclass
+class _RenderJob:
+    row: dict[str, str]
+    context: dict[str, object]
+    domain: str
+    signal_type: str
+    source_evidence: str
+    focus_rule: str
+
+
 def sha256_file(path: str | Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
@@ -213,6 +223,22 @@ def _ctas_for_focus_rule(
     raise ValueError(f"no CTA variant is configured for focus rule '{focus_rule}'")
 
 
+def _balanced_ctas_for_rendered_domains(
+    variants: tuple[CtaVariant, ...],
+    domain_focus_rules: list[tuple[str, str]],
+) -> dict[str, CtaVariant]:
+    """Balance CTAs within each applicable focus-rule pool."""
+    grouped: dict[tuple[str, ...], tuple[tuple[CtaVariant, ...], list[str]]] = {}
+    for domain, focus_rule in dict.fromkeys(domain_focus_rules):
+        applicable = _ctas_for_focus_rule(variants, focus_rule)
+        key = tuple(variant.variant_id for variant in applicable)
+        grouped.setdefault(key, (applicable, []))[1].append(domain)
+    assigned: dict[str, CtaVariant] = {}
+    for applicable, domains in grouped.values():
+        assigned.update(_balanced_ctas(applicable, domains))
+    return assigned
+
+
 def _stable_offer_line(
     variants: tuple[OfferLineVariant, ...], domain: str
 ) -> OfferLineVariant:
@@ -252,6 +278,24 @@ def _offer_lines_for_focus_rule(
     if fallback:
         return fallback
     raise ValueError(f"no offer-line variant is configured for focus rule '{focus_rule}'")
+
+
+def _balanced_offer_lines_for_rendered_domains(
+    variants: tuple[OfferLineVariant, ...],
+    domain_focus_rules: list[tuple[str, str]],
+) -> dict[str, OfferLineVariant]:
+    """Balance offer lines within each applicable focus-rule pool."""
+    grouped: dict[
+        tuple[str, ...], tuple[tuple[OfferLineVariant, ...], list[str]]
+    ] = {}
+    for domain, focus_rule in dict.fromkeys(domain_focus_rules):
+        applicable = _offer_lines_for_focus_rule(variants, focus_rule)
+        key = tuple(variant.variant_id for variant in applicable)
+        grouped.setdefault(key, (applicable, []))[1].append(domain)
+    assigned: dict[str, OfferLineVariant] = {}
+    for applicable, domains in grouped.values():
+        assigned.update(_balanced_offer_lines(applicable, domains))
+    return assigned
 
 
 def _angle_for_signal(campaign: CampaignConfig, signal_type: str) -> CopyAngle:
@@ -785,12 +829,36 @@ def _apply_batch_quality(
             for domain in affected:
                 flags_by_domain.setdefault(domain, []).append(message)
 
-    for affected in exact_domains.values():
+    angle_domain_counts = Counter(
+        row.get("personalization_angle", "") for row in representatives.values()
+    )
+    angle_template_counts = {
+        angle.angle_id: len(angle.templates) for angle in campaign.angles
+    }
+    for pitch, affected in exact_domains.items():
         share = len(affected) / total
-        if len(affected) > 1 and share > float(quality["max_exact_pitch_share"]):
+        representative = next(
+            row
+            for row in representatives.values()
+            if row.get(campaign.output_field, "").casefold() == pitch
+        )
+        angle_id = representative.get("personalization_angle", "")
+        template_count = max(1, angle_template_counts.get(angle_id, 1))
+        angle_domain_count = angle_domain_counts.get(angle_id, total)
+        balanced_floor = ((angle_domain_count + template_count - 1) // template_count) / total
+        effective_limit = max(
+            float(quality["max_exact_pitch_share"]), balanced_floor
+        )
+        if len(affected) > 1 and share > effective_limit:
             message = f"exact pitch appears on {share:.1%} of rendered domains"
             warnings.append(
-                {"type": "exact_pitch_share", "count": len(affected), "share": round(share, 4)}
+                {
+                    "type": "exact_pitch_share",
+                    "count": len(affected),
+                    "share": round(share, 4),
+                    "configured_limit": quality["max_exact_pitch_share"],
+                    "effective_limit": round(effective_limit, 4),
+                }
             )
             for domain in affected:
                 flags_by_domain.setdefault(domain, []).append(message)
@@ -988,11 +1056,8 @@ def run_enrichment(
     )
 
     append_fields = list(campaign.data["output"]["append_fields"])
-    cta_by_domain = _balanced_ctas(campaign.default_cta_variants, unique_domains)
-    offer_line_by_domain = _balanced_offer_lines(
-        campaign.default_offer_line_variants, unique_domains
-    )
     output_rows: list[dict[str, str]] = []
+    render_jobs: list[_RenderJob] = []
     for row, domain in zip(data.rows, domains, strict=True):
         output_row = dict(row)
         signal = domain_results.get(domain) if domain else None
@@ -1204,37 +1269,66 @@ def run_enrichment(
                     f"signal confidence {fact.confidence:.2f} is below "
                     f"{campaign.min_confidence:.2f}"
                 )
-            try:
-                rendered = _build_copy(
-                    campaign,
-                    context,
-                    domain,
-                    fact.signal_type,
-                    fact.evidence,
-                    focus_rule=commercial_focus.rule_id,
-                    cta_variant=cta_by_domain.get(domain),
-                    offer_variant=offer_line_by_domain.get(domain),
-                )
-                values["personalized_subject"] = rendered.subject
-                values[campaign.output_field] = rendered.pitch
-                values["personalized_email"] = rendered.body
-                values["personalization_angle"] = rendered.angle_id
-                values["personalization_template"] = rendered.template_id
-                values["personalization_cta_variant"] = rendered.cta_variant_id
-                values["personalization_cta"] = rendered.cta
-                values["personalization_offer_variant"] = rendered.offer_variant_id
-                values["personalization_offer_line"] = rendered.offer_line
-                values["personalization_status"] = "review" if low_confidence else "ready"
-            except (KeyError, ValueError) as exc:
-                values["personalization_status"] = "error"
-                errors.append(str(exc))
+            values["personalization_status"] = "review" if low_confidence else "ready"
 
         values["personalization_error"] = "; ".join(error for error in errors if error)
         output_row.update(values)
-        _refresh_outreach_status(output_row)
-        if output_row["outreach_status"] == "excluded":
-            _blank_rendered_copy(output_row, campaign)
         output_rows.append(output_row)
+        if should_render:
+            render_jobs.append(
+                _RenderJob(
+                    row=output_row,
+                    context=context,
+                    domain=domain,
+                    signal_type=fact.signal_type,
+                    source_evidence=fact.evidence,
+                    focus_rule=commercial_focus.rule_id,
+                )
+            )
+
+    domain_focus_rules = [
+        (job.domain, job.focus_rule) for job in render_jobs
+    ]
+    cta_by_domain = _balanced_ctas_for_rendered_domains(
+        campaign.cta_variants,
+        domain_focus_rules,
+    )
+    offer_line_by_domain = _balanced_offer_lines_for_rendered_domains(
+        campaign.offer_line_variants,
+        domain_focus_rules,
+    )
+    for job in render_jobs:
+        try:
+            rendered = _build_copy(
+                campaign,
+                job.context,
+                job.domain,
+                job.signal_type,
+                job.source_evidence,
+                focus_rule=job.focus_rule,
+                cta_variant=cta_by_domain[job.domain],
+                offer_variant=offer_line_by_domain[job.domain],
+            )
+            job.row["personalized_subject"] = rendered.subject
+            job.row[campaign.output_field] = rendered.pitch
+            job.row["personalized_email"] = rendered.body
+            job.row["personalization_angle"] = rendered.angle_id
+            job.row["personalization_template"] = rendered.template_id
+            job.row["personalization_cta_variant"] = rendered.cta_variant_id
+            job.row["personalization_cta"] = rendered.cta
+            job.row["personalization_offer_variant"] = rendered.offer_variant_id
+            job.row["personalization_offer_line"] = rendered.offer_line
+        except (KeyError, ValueError) as exc:
+            job.row["personalization_status"] = "error"
+            existing = job.row.get("personalization_error", "").strip()
+            job.row["personalization_error"] = "; ".join(
+                item for item in (existing, str(exc)) if item
+            )
+
+    for row in output_rows:
+        _refresh_outreach_status(row)
+        if row["outreach_status"] == "excluded":
+            _blank_rendered_copy(row, campaign)
 
     duplicate_email_rows = _deduplicate_emails(
         output_rows,

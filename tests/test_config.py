@@ -49,6 +49,10 @@ class CampaignConfigTests(unittest.TestCase):
                 self.assertNotIn("the model is", variant.text.casefold())
                 self.assertNotIn("guarantee", variant.text.casefold())
                 self.assertNotIn("client result", variant.text.casefold())
+        for variant in config.cta_variants:
+            with self.subTest(cta=variant.variant_id):
+                self.assertIn("25", variant.text)
+                self.assertIn("compan", variant.text.casefold())
 
     def test_missing_output_merge_field_is_rejected(self) -> None:
         payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())

@@ -14,6 +14,7 @@
 - HTTPS, redirect, timeout, retry, response-size, and content-type controls
 - Private, loopback, link-local, and reserved network blocking
 - Deterministic extraction of up to three structured company facts with source evidence
+- Detail-page inspection even when homepage metadata scores highly, with body-evidence diversity so generic metadata cannot crowd out substantive first-party facts
 - Campaign-scoped regex mapping from raw website signals to one commercial category and buyer phrase
 - Core, secondary, and exclude fit tiers in each campaign focus table
 - Campaign-specific title and seniority qualification with mandatory title matching
@@ -42,10 +43,11 @@
 - Independent Firecrawl success/failure caching and manifest counters
 - Ordered, campaign-configured input-CSV evidence fallback with explicit source and confidence auditing
 - Conversational first-name cleanup and subject-safe company-name normalization
-- Deterministically balanced offer-line and CTA assignment across each batch
+- Deterministically balanced offer-line and CTA assignment across rendered companies within each applicable focus-rule pool
 - Evidence-only focus matching with most-specific-rule selection across candidate facts
 - Fail-closed first-party precedence: CSV evidence is considered only when the website is unavailable
 - Buyer-phrase, offer-line, and CTA concentration checks in batch QA
+- Exact-pitch concentration checks with a template-capacity floor, preventing impossible thresholds from sending balanced copy to review
 
 ## Deliberate boundaries
 

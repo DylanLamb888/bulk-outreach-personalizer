@@ -113,6 +113,23 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(review.status, "review")
         self.assertEqual(excluded.status, "excluded")
 
+    def test_president_is_not_mistaken_for_a_generic_vice_president(self) -> None:
+        president = qualify_contact(
+            first_name="Nick",
+            job_title="President",
+            job_seniority="Vice President",
+            campaign=self.campaign,
+        )
+        vice_president = qualify_contact(
+            first_name="Pat",
+            job_title="Vice President",
+            job_seniority="Vice President",
+            campaign=self.campaign,
+        )
+
+        self.assertEqual(president.status, "qualified")
+        self.assertEqual(vice_president.status, "review")
+
     def test_email_status_policy_and_syntax_fallback(self) -> None:
         self.assertTrue(valid_email_syntax("sam@example.com"))
         self.assertFalse(valid_email_syntax("not-an-email"))
