@@ -475,6 +475,19 @@ class PipelineTests(unittest.TestCase):
         counts = Counter(item.variant_id for item in first.values())
         self.assertLessEqual(max(counts.values()) - min(counts.values()), 1)
 
+    def test_domain_with_two_focus_rules_is_assigned_once_from_first_rule_pool(self) -> None:
+        variants = (
+            CtaVariant(variant_id="x-only", text="Want the 3 X ideas?", focus_rules=("rule-x",)),
+            CtaVariant(variant_id="y-only", text="Want the 3 Y ideas?", focus_rules=("rule-y",)),
+            CtaVariant(variant_id="default", text="Want the outline?", focus_rules=("*",)),
+        )
+        assigned = _balanced_ctas_for_rendered_domains(
+            variants,
+            [("a.example", "rule-x"), ("a.example", "rule-y"), ("b.example", "rule-y")],
+        )
+        self.assertEqual(assigned["a.example"].variant_id, "x-only")
+        self.assertEqual(assigned["b.example"].variant_id, "y-only")
+
     def test_rendered_domain_variants_balance_within_focus_pools(self) -> None:
         ctas = (
             CtaVariant("general-one", "General one."),

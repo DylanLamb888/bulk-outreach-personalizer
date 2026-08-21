@@ -227,9 +227,16 @@ def _balanced_ctas_for_rendered_domains(
     variants: tuple[CtaVariant, ...],
     domain_focus_rules: list[tuple[str, str]],
 ) -> dict[str, CtaVariant]:
-    """Balance CTAs within each applicable focus-rule pool."""
+    """Balance CTAs within each applicable focus-rule pool.
+
+    A domain is assigned exactly once, from its first-seen focus rule's pool;
+    rows matching another rule fall back to per-row selection in copy building.
+    """
+    first_rule: dict[str, str] = {}
+    for domain, focus_rule in domain_focus_rules:
+        first_rule.setdefault(domain, focus_rule)
     grouped: dict[tuple[str, ...], tuple[tuple[CtaVariant, ...], list[str]]] = {}
-    for domain, focus_rule in dict.fromkeys(domain_focus_rules):
+    for domain, focus_rule in first_rule.items():
         applicable = _ctas_for_focus_rule(variants, focus_rule)
         key = tuple(variant.variant_id for variant in applicable)
         grouped.setdefault(key, (applicable, []))[1].append(domain)
@@ -284,11 +291,18 @@ def _balanced_offer_lines_for_rendered_domains(
     variants: tuple[OfferLineVariant, ...],
     domain_focus_rules: list[tuple[str, str]],
 ) -> dict[str, OfferLineVariant]:
-    """Balance offer lines within each applicable focus-rule pool."""
+    """Balance offer lines within each applicable focus-rule pool.
+
+    A domain is assigned exactly once, from its first-seen focus rule's pool;
+    rows matching another rule fall back to per-row selection in copy building.
+    """
+    first_rule: dict[str, str] = {}
+    for domain, focus_rule in domain_focus_rules:
+        first_rule.setdefault(domain, focus_rule)
     grouped: dict[
         tuple[str, ...], tuple[tuple[OfferLineVariant, ...], list[str]]
     ] = {}
-    for domain, focus_rule in dict.fromkeys(domain_focus_rules):
+    for domain, focus_rule in first_rule.items():
         applicable = _offer_lines_for_focus_rule(variants, focus_rule)
         key = tuple(variant.variant_id for variant in applicable)
         grouped.setdefault(key, (applicable, []))[1].append(domain)
