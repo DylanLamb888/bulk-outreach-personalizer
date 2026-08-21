@@ -1247,7 +1247,14 @@ def run_enrichment(
         )
         if should_render:
             title = str(context.get("job_title", ""))
-            hook = title_hooks.match(title)
+            try:
+                hook = title_hooks.match(title)
+            except ValueError as exc:
+                # One unmatched title must fail its own row, not the whole run.
+                errors.append(f"title hook: {exc}")
+                values["personalization_status"] = "error"
+                should_render = False
+        if should_render:
             company_name = str(context.get("company_name", ""))
             context.update(
                 {

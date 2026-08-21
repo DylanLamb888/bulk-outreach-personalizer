@@ -224,6 +224,41 @@ class PipelineTests(unittest.TestCase):
                 Path(manifest["settings"]["commercial_focus_snapshot_path"]).is_file()
             )
 
+    def test_title_hook_gap_fails_only_the_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            hooks_path = tmp_path / "hooks.csv"
+            hooks_path.write_text(
+                "priority,title_pattern,persona,hook\n"
+                '10,chief financial officer,finance,"From finance, timing matters"\n',
+                encoding="utf-8",
+            )
+            input_path = tmp_path / "leads.csv"
+            input_path.write_text(
+                "Email,Email status,First name,Job title,Job seniority,Company name,Website\n"
+                "ben@core.example,VERIFIED,Ben,Founder,Founder/Owner,Core Adviser,core.example\n",
+                encoding="utf-8",
+            )
+            output = tmp_path / "audit.csv"
+            campaign = load_campaign(
+                ROOT / "campaigns" / "examples" / "scale-olympus.json"
+            )
+            manifest = run_enrichment(
+                input_path=input_path,
+                output_path=output,
+                campaign=campaign,
+                title_hooks=TitleHookTable.load(hooks_path),
+                commercial_focuses=CommercialFocusTable.load(campaign.focus_rules_path),
+                options=RunOptions(cache_dir=tmp_path / "cache"),
+                domain_enricher=MappingDomainEnricher(),
+            )
+            with output.open(encoding="utf-8-sig", newline="") as handle:
+                row = next(csv.DictReader(handle))
+            self.assertEqual(row["personalization_status"], "error")
+            self.assertIn("no fallback rule", row["personalization_error"])
+            self.assertEqual(row["outreach_status"], "error")
+            self.assertEqual(manifest["output"]["status_counts"], {"error": 1})
+
     def test_company_selection_prefers_first_party_and_corroborated_csv(self) -> None:
         def candidate(
             *,
