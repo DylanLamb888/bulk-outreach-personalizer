@@ -409,6 +409,9 @@ def _build_copy(
             failures.append(f"{template.template_id}: {exc}")
             continue
 
+        if not subject.strip():
+            failures.append(f"{template.template_id}: rendered subject is empty")
+            continue
         if word_count(subject) > campaign.max_subject_words:
             failures.append(
                 f"{template.template_id}: subject exceeds {campaign.max_subject_words} words"
@@ -1256,7 +1259,6 @@ def run_enrichment(
                     ),
                     "buyer_phrase": commercial_focus.buyer_phrase,
                     "company_evidence": fact.evidence,
-                    "company_short_name": _short_company_name(company_name),
                     "personalization_source": fact.source_url,
                     "title_hook": hook.hook,
                     "persona": hook.persona,
@@ -1264,6 +1266,11 @@ def run_enrichment(
                     "audience": campaign.data["offer"]["audience"],
                 }
             )
+            # A blank company name must fail closed as a missing merge field,
+            # never render into an empty subject or greeting.
+            short_name = _short_company_name(company_name)
+            if short_name:
+                context["company_short_name"] = short_name
             if low_confidence:
                 errors.append(
                     f"signal confidence {fact.confidence:.2f} is below "

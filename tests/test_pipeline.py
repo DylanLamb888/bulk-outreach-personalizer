@@ -127,6 +127,28 @@ class MappingDomainEnricher:
 
 
 class PipelineTests(unittest.TestCase):
+    def _template_copy_context(self) -> dict[str, object]:
+        return {
+            "first_name": "Ana",
+            "buyer_phrase": "owners planning an exit",
+            "company_focus": "sell-side advisory",
+            "company_short_name": "Northstar",
+        }
+
+    def test_build_copy_rejects_empty_rendered_subject(self) -> None:
+        campaign = load_campaign(ROOT / "campaigns" / "campaign-template.json")
+        context = self._template_copy_context()
+        context["company_short_name"] = ""
+        with self.assertRaisesRegex(ValueError, "rendered subject is empty"):
+            _build_copy(campaign, context, "northstar.example", "service", "")
+
+    def test_build_copy_reports_missing_company_short_name(self) -> None:
+        campaign = load_campaign(ROOT / "campaigns" / "campaign-template.json")
+        context = self._template_copy_context()
+        del context["company_short_name"]
+        with self.assertRaisesRegex(ValueError, "company_short_name"):
+            _build_copy(campaign, context, "northstar.example", "service", "")
+
     def test_configuration_snapshots_are_content_addressed_and_immutable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
