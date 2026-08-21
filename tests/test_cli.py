@@ -66,6 +66,28 @@ class CliTests(unittest.TestCase):
             self.assertIn("test_only", payload["execution_blocker"])
             self.assertFalse(output.exists())
 
+    def test_prune_cache_reports_removed_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                code = main(
+                    [
+                        "--input",
+                        str(ROOT / "tests" / "fixtures" / "leads.csv"),
+                        "--output",
+                        str(Path(tmp) / "enriched.csv"),
+                        "--campaign",
+                        str(ROOT / "campaigns" / "examples" / "scale-olympus.json"),
+                        "--cache-dir",
+                        str(Path(tmp) / "cache"),
+                        "--prune-cache",
+                        "--validate-only",
+                    ]
+                )
+            self.assertEqual(code, 0)
+            self.assertIn("pruned 0 expired cache entries", stderr.getvalue())
+
     def test_production_run_refuses_unapproved_test_campaign(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             stderr = io.StringIO()

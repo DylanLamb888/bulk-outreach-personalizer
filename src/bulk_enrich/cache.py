@@ -45,6 +45,30 @@ class JsonCache:
             return None
         return value
 
+    def prune(self, *, ttl_hours: float) -> int:
+        """Delete entries stored before the TTL window; returns the count removed.
+
+        Unreadable or malformed entries are treated as expired.
+        """
+        cutoff = time.time() - ttl_hours * 3600
+        removed = 0
+        for path in self.root.glob("*/??/*.json.gz"):
+            stored_at = 0.0
+            try:
+                with gzip.open(path, "rt", encoding="utf-8") as handle:
+                    raw = json.load(handle).get("stored_at", 0.0)
+                if isinstance(raw, (int, float)):
+                    stored_at = float(raw)
+            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                stored_at = 0.0
+            if stored_at < cutoff:
+                try:
+                    path.unlink()
+                    removed += 1
+                except OSError:
+                    continue
+        return removed
+
     def put(self, namespace: str, key: str, value: dict[str, Any]) -> Path:
         path = self._path(namespace, key)
         path.parent.mkdir(parents=True, exist_ok=True)

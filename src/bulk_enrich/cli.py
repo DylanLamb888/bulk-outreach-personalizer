@@ -10,6 +10,7 @@ from collections import Counter
 from pathlib import Path
 
 from bulk_enrich import __version__
+from bulk_enrich.cache import JsonCache
 from bulk_enrich.config import CampaignConfigError, load_campaign
 from bulk_enrich.csv_io import inspect_csv
 from bulk_enrich.focus import CommercialFocusError, CommercialFocusTable
@@ -166,6 +167,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ignore existing cache entries and fetch fresh public pages",
     )
     parser.add_argument(
+        "--prune-cache",
+        action="store_true",
+        help="Delete cache entries older than --cache-ttl-hours before running",
+    )
+    parser.add_argument(
         "--allow-test-campaign",
         action="store_true",
         help="Allow a production output using a campaign marked test_only",
@@ -258,6 +264,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        if args.prune_cache:
+            removed = JsonCache(
+                Path(args.cache_dir).expanduser().resolve()
+            ).prune(ttl_hours=args.cache_ttl_hours)
+            print(f"pruned {removed} expired cache entries", file=sys.stderr)
         campaign = load_campaign(args.campaign)
         if args.validate_only:
             payload = _validation_payload(
