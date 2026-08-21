@@ -295,6 +295,37 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(row["outreach_status"], "error")
             self.assertEqual(manifest["output"]["status_counts"], {"error": 1})
 
+    def test_manifest_reports_focus_gaps_for_unmatched_domains(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            input_path = tmp_path / "leads.csv"
+            input_path.write_text(
+                "Email,Email status,First name,Job title,Job seniority,Company name,Website\n"
+                "ben@core.example,VERIFIED,Ben,Founder,Founder/Owner,Core Adviser,core.example\n",
+                encoding="utf-8",
+            )
+            output = tmp_path / "audit.csv"
+            campaign = load_campaign(
+                ROOT / "campaigns" / "examples" / "scale-olympus.json"
+            )
+            manifest = run_enrichment(
+                input_path=input_path,
+                output_path=output,
+                campaign=campaign,
+                title_hooks=TitleHookTable.load(ROOT / "config" / "title-hooks.csv"),
+                commercial_focuses=CommercialFocusTable.load(campaign.focus_rules_path),
+                options=RunOptions(cache_dir=tmp_path / "cache"),
+                domain_enricher=FailedDomainEnricher(),
+            )
+            gaps = manifest["focus_gaps"]
+            self.assertEqual(gaps["domains"], 1)
+            sample = gaps["samples"][0]
+            self.assertEqual(sample["domain"], "core.example")
+            self.assertEqual(sample["rule"], "no-company-evidence")
+            self.assertIn("tier", sample)
+            self.assertIn("source_focus", sample)
+            self.assertIn("evidence", sample)
+
     def test_company_selection_prefers_first_party_and_corroborated_csv(self) -> None:
         def candidate(
             *,

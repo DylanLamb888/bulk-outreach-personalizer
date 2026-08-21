@@ -1476,6 +1476,27 @@ def run_enrichment(
     company_rule_counts = Counter(
         row["company_fit_rule"] for row in output_rows if row["company_fit_rule"]
     )
+    # Surface where the campaign's focus rules failed to match so the operator
+    # can iterate the focus CSV without mining the audit output.
+    focus_gap_samples: list[dict[str, str]] = []
+    focus_gap_domains: set[str] = set()
+    for row, domain in zip(output_rows, domains, strict=True):
+        if not domain or domain in focus_gap_domains:
+            continue
+        rule = row.get("company_fit_rule", "")
+        tier = row.get("company_fit_tier", "")
+        if rule in {"no-company-evidence", "generic-compression"} or tier == "exclude":
+            focus_gap_domains.add(domain)
+            if len(focus_gap_samples) < 25:
+                focus_gap_samples.append(
+                    {
+                        "domain": domain,
+                        "rule": rule,
+                        "tier": tier,
+                        "source_focus": row.get("personalization_source_focus", ""),
+                        "evidence": row.get("company_fit_evidence", "")[:240],
+                    }
+                )
     rendered_company_rows: dict[str, dict[str, str]] = {}
     for row, domain in zip(output_rows, domains, strict=True):
         if (
@@ -1561,6 +1582,10 @@ def run_enrichment(
             "unique_rendered_companies": len(rendered_company_rows),
         },
         "quality": quality_report,
+        "focus_gaps": {
+            "domains": len(focus_gap_domains),
+            "samples": focus_gap_samples,
+        },
         "settings": {
             **asdict(options),
             "cache_dir": str(options.cache_dir),
