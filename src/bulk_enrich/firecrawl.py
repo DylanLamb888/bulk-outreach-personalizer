@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+from bulk_enrich import __version__
 from bulk_enrich.cache import JsonCache
 from bulk_enrich.fetcher import UnsafeURLError, normalize_url, validate_public_url
 from bulk_enrich.models import FetchResult
@@ -167,7 +168,7 @@ class FirecrawlFetcher:
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": "BulkEnrich/0.8 Firecrawl fallback",
+            "User-Agent": f"BulkEnrich/{__version__} Firecrawl fallback",
         }
         if self.settings.api_key.strip():
             headers["Authorization"] = f"Bearer {self.settings.api_key.strip()}"

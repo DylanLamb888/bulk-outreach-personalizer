@@ -28,8 +28,8 @@ from bulk_enrich.config import (
 from bulk_enrich.csv_io import (
     context_for_row,
     domain_for_row,
-    inspect_csv,
     load_csv,
+    summarize_csv,
     write_enriched_csv,
 )
 from bulk_enrich.fetcher import FetcherSettings, HttpFetcher
@@ -1525,7 +1525,7 @@ def run_enrichment(
             "duration_seconds": round(time.monotonic() - started_monotonic, 3),
         },
         "input": {
-            **inspect_csv(input_resolved).to_dict(),
+            **summarize_csv(data).to_dict(),
             "sha256": sha256_file(input_resolved),
         },
         "output": {

@@ -118,8 +118,7 @@ def load_csv(path: str | Path) -> CSVData:
     return CSVData(path=csv_path, headers=headers, rows=rows, column_map=mapping)
 
 
-def inspect_csv(path: str | Path) -> CSVSummary:
-    data = load_csv(path)
+def summarize_csv(data: CSVData) -> CSVSummary:
     rows = data.rows
     mapping = data.column_map
 
@@ -155,6 +154,10 @@ def inspect_csv(path: str | Path) -> CSVSummary:
             else len(rows)
         ),
     )
+
+
+def inspect_csv(path: str | Path) -> CSVSummary:
+    return summarize_csv(load_csv(path))
 
 
 def context_for_row(row: dict[str, str], mapping: dict[str, str]) -> dict[str, Any]:

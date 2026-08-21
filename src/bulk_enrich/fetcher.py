@@ -16,12 +16,14 @@ from email.message import Message
 from typing import Any
 from urllib.parse import urldefrag, urlsplit, urlunsplit
 
+from bulk_enrich import __version__
 from bulk_enrich.cache import JsonCache
 from bulk_enrich.models import FetchResult
 
 
 DEFAULT_USER_AGENT = (
-    "Mozilla/5.0 (compatible; BulkEnrich/0.1; deterministic public-site enrichment)"
+    f"Mozilla/5.0 (compatible; BulkEnrich/{__version__}; "
+    "deterministic public-site enrichment)"
 )
 
 
