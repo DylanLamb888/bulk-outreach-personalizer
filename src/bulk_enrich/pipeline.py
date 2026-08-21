@@ -511,6 +511,8 @@ def _candidate_facts(
 def _select_company_candidate(
     candidates: list[tuple[int, int, CompanyFact, CommercialFocusResult]],
     campaign: CampaignConfig,
+    *,
+    website_available: bool = False,
 ) -> tuple[
     tuple[int, int, CompanyFact, CommercialFocusResult] | None,
     tuple[str, ...],
@@ -538,6 +540,11 @@ def _select_company_candidate(
             website_any,
             key=lambda item: (item[0], -item[2].confidence, item[1]),
         ), ()
+
+    if website_available:
+        # Blocking unusable first-party facts must not silently turn a readable
+        # website into a CSV-fallback case.
+        return None, ()
 
     approved_headers = {
         item.casefold() for item in campaign.fallback_qualification_fields
@@ -894,12 +901,15 @@ def _apply_batch_quality(
         angle_id = representative.get("personalization_angle", "")
         template_count = max(1, angle_template_counts.get(angle_id, 1))
         angle_domain_count = angle_domain_counts.get(angle_id, total)
-        balanced_floor = ((angle_domain_count + template_count - 1) // template_count) / total
-        effective_limit = max(
-            float(quality["max_exact_pitch_share"]), balanced_floor
-        )
-        if len(affected) > 1 and share > effective_limit:
-            allowed = int(total * effective_limit)
+        balanced_capacity = (
+            angle_domain_count + template_count - 1
+        ) // template_count
+        balanced_floor = balanced_capacity / total
+        configured_limit = float(quality["max_exact_pitch_share"])
+        effective_limit = max(configured_limit, balanced_floor)
+        configured_capacity = int(total * configured_limit + 1e-12)
+        allowed = max(configured_capacity, balanced_capacity)
+        if len(affected) > max(allowed, 1):
             overflow = _overflow_domains("exact-pitch", pitch, affected, allowed)
             message = (
                 f"exact pitch appears on {share:.1%} of rendered domains; "
@@ -1145,11 +1155,19 @@ def run_enrichment(
             str(context.get("email_status", "")),
             campaign,
         )
-        company_result = QualificationResult(
-            status="excluded",
-            rule="no-company-evidence",
-            reason="no campaign-mapped company evidence was found",
-        )
+        company_name = str(context.get("company_name", "")).strip()
+        if company_name:
+            company_result = QualificationResult(
+                status="excluded",
+                rule="no-company-evidence",
+                reason="no campaign-mapped company evidence was found",
+            )
+        else:
+            company_result = QualificationResult(
+                status="excluded",
+                rule="missing-company-name",
+                reason="company name is missing",
+            )
         values = {
             "personalized_subject": "",
             campaign.output_field: "",
@@ -1197,7 +1215,9 @@ def run_enrichment(
         commercial_focus: CommercialFocusResult | None = None
         corroborating_fields: tuple[str, ...] = ()
 
-        if not domain:
+        if not company_name:
+            errors.append("missing company name")
+        elif not domain:
             errors.append("missing company domain or website")
         else:
             facts = _candidate_facts(signal, row, campaign)
@@ -1208,7 +1228,6 @@ def run_enrichment(
                     else "domain enrichment did not return a usable result"
                 )
             else:
-                company_name = str(context.get("company_name", ""))
                 focus_errors: list[str] = []
                 resolved_candidates: list[
                     tuple[int, int, CompanyFact, CommercialFocusResult]
@@ -1237,6 +1256,7 @@ def run_enrichment(
                 selected_candidate, corroborating_fields = _select_company_candidate(
                     resolved_candidates,
                     campaign,
+                    website_available=signal is not None and signal.status == "ok",
                 )
                 if selected_candidate is not None:
                     _priority, _index, fact, commercial_focus = selected_candidate
@@ -1476,27 +1496,35 @@ def run_enrichment(
     company_rule_counts = Counter(
         row["company_fit_rule"] for row in output_rows if row["company_fit_rule"]
     )
-    # Surface where the campaign's focus rules failed to match so the operator
-    # can iterate the focus CSV without mining the audit output.
-    focus_gap_samples: list[dict[str, str]] = []
-    focus_gap_domains: set[str] = set()
+    # Keep genuine mapping gaps separate from intentional exclusions so the
+    # operator can iterate rules without losing the exclusion audit trail.
+    unmatched_samples: list[dict[str, str]] = []
+    excluded_samples: list[dict[str, str]] = []
+    unmatched_domains: set[str] = set()
+    excluded_domains: set[str] = set()
+    reported_domains: set[str] = set()
     for row, domain in zip(output_rows, domains, strict=True):
-        if not domain or domain in focus_gap_domains:
+        if not domain or domain in reported_domains:
             continue
         rule = row.get("company_fit_rule", "")
         tier = row.get("company_fit_tier", "")
-        if rule in {"no-company-evidence", "generic-compression"} or tier == "exclude":
-            focus_gap_domains.add(domain)
-            if len(focus_gap_samples) < 25:
-                focus_gap_samples.append(
-                    {
-                        "domain": domain,
-                        "rule": rule,
-                        "tier": tier,
-                        "source_focus": row.get("personalization_source_focus", ""),
-                        "evidence": row.get("company_fit_evidence", "")[:240],
-                    }
-                )
+        sample = {
+            "domain": domain,
+            "rule": rule,
+            "tier": tier,
+            "source_focus": row.get("personalization_source_focus", ""),
+            "evidence": row.get("company_fit_evidence", "")[:240],
+        }
+        if rule in {"no-company-evidence", "generic-compression"}:
+            reported_domains.add(domain)
+            unmatched_domains.add(domain)
+            if len(unmatched_samples) < 25:
+                unmatched_samples.append(sample)
+        elif tier == "exclude":
+            reported_domains.add(domain)
+            excluded_domains.add(domain)
+            if len(excluded_samples) < 25:
+                excluded_samples.append(sample)
     rendered_company_rows: dict[str, dict[str, str]] = {}
     for row, domain in zip(output_rows, domains, strict=True):
         if (
@@ -1583,8 +1611,10 @@ def run_enrichment(
         },
         "quality": quality_report,
         "focus_gaps": {
-            "domains": len(focus_gap_domains),
-            "samples": focus_gap_samples,
+            "unmatched_domains": len(unmatched_domains),
+            "unmatched_samples": unmatched_samples,
+            "excluded_domains": len(excluded_domains),
+            "excluded_samples": excluded_samples,
         },
         "settings": {
             **asdict(options),

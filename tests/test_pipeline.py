@@ -101,7 +101,7 @@ class FailedDomainEnricher:
 
 class MappingDomainEnricher:
     focuses = {
-        "off.example": "commercial washing and disinfection",
+        "off.example": "piano restoration and repair",
         "core.example": "sell-side M&A advisory for private company owners",
         "secondary.example": "flexible capital solutions",
     }
@@ -220,6 +220,12 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(len(ready_rows), 1)
             self.assertEqual(len(review_rows), 1)
             self.assertEqual(manifest["qualification"]["duplicate_email_rows_excluded"], 1)
+            self.assertEqual(manifest["focus_gaps"]["unmatched_domains"], 0)
+            self.assertEqual(manifest["focus_gaps"]["excluded_domains"], 1)
+            self.assertEqual(
+                manifest["focus_gaps"]["excluded_samples"][0]["domain"],
+                "off.example",
+            )
             self.assertTrue(Path(manifest["campaign"]["snapshot_path"]).is_file())
             self.assertTrue(
                 Path(manifest["settings"]["commercial_focus_snapshot_path"]).is_file()
@@ -260,6 +266,59 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(len(facts), 1)
         self.assertIn("customs brokerage", facts[0].evidence)
 
+    def test_blocked_website_evidence_does_not_enable_csv_fallback(self) -> None:
+        campaign = load_campaign(
+            ROOT / "campaigns" / "examples" / "scale-olympus.json"
+        )
+        campaign.data["personalization"]["blocked_evidence_phrases"] = [
+            "blocked site boilerplate"
+        ]
+        signal = SiteSignal(
+            domain="example.com",
+            observation="blocked site boilerplate",
+            evidence="blocked site boilerplate",
+            source_url="https://example.com/",
+            confidence=0.9,
+            status="ok",
+            facts=(
+                CompanyFact(
+                    signal_type="service",
+                    focus="site boilerplate",
+                    observation="blocked site boilerplate",
+                    evidence="blocked site boilerplate",
+                    source_url="https://example.com/",
+                    confidence=0.9,
+                ),
+            ),
+        )
+        row = {
+            "Company description": "M&A advisory for privately held companies",
+            "Company keywords": (
+                "Mergers and acquisitions advisory for privately held companies"
+            ),
+        }
+        focuses = CommercialFocusTable.load(campaign.focus_rules_path)
+        resolved_candidates = []
+        for index, fact in enumerate(_candidate_facts(signal, row, campaign)):
+            focus = focuses.resolve(
+                company_name="Example",
+                signal_type=fact.signal_type,
+                source_focus=fact.focus,
+                evidence=fact.evidence,
+                max_focus_words=campaign.max_focus_words,
+                max_buyer_phrase_words=campaign.max_buyer_phrase_words,
+            )
+            resolved_candidates.append((focus.priority, index, fact, focus))
+
+        selected, fields = _select_company_candidate(
+            resolved_candidates,
+            campaign,
+            website_available=True,
+        )
+
+        self.assertIsNone(selected)
+        self.assertEqual(fields, ())
+
     def test_title_hook_gap_fails_only_the_row(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -295,6 +354,40 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(row["outreach_status"], "error")
             self.assertEqual(manifest["output"]["status_counts"], {"error": 1})
 
+    def test_blank_company_name_is_excluded_with_real_campaign(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            input_path = tmp_path / "leads.csv"
+            input_path.write_text(
+                "Email,Email status,First name,Job title,Job seniority,Company name,Website\n"
+                "ben@core.example,VERIFIED,Ben,Founder,Founder/Owner,,core.example\n",
+                encoding="utf-8",
+            )
+            output = tmp_path / "audit.csv"
+            campaign = load_campaign(
+                ROOT / "campaigns" / "examples" / "scale-olympus.json"
+            )
+            manifest = run_enrichment(
+                input_path=input_path,
+                output_path=output,
+                campaign=campaign,
+                title_hooks=TitleHookTable.load(ROOT / "config" / "title-hooks.csv"),
+                commercial_focuses=CommercialFocusTable.load(campaign.focus_rules_path),
+                options=RunOptions(cache_dir=tmp_path / "cache"),
+                domain_enricher=MappingDomainEnricher(),
+            )
+            with output.open(encoding="utf-8-sig", newline="") as handle:
+                row = next(csv.DictReader(handle))
+
+            self.assertEqual(row["company_fit_status"], "excluded")
+            self.assertEqual(row["company_fit_rule"], "missing-company-name")
+            self.assertEqual(row["personalization_status"], "blank")
+            self.assertEqual(row["personalized_subject"], "")
+            self.assertEqual(row["personalized_email"], "")
+            self.assertEqual(row["outreach_status"], "excluded")
+            self.assertIn("company name is missing", row["outreach_reason"])
+            self.assertEqual(manifest["output"]["status_counts"], {"excluded": 1})
+
     def test_manifest_reports_focus_gaps_for_unmatched_domains(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -318,8 +411,9 @@ class PipelineTests(unittest.TestCase):
                 domain_enricher=FailedDomainEnricher(),
             )
             gaps = manifest["focus_gaps"]
-            self.assertEqual(gaps["domains"], 1)
-            sample = gaps["samples"][0]
+            self.assertEqual(gaps["unmatched_domains"], 1)
+            self.assertEqual(gaps["excluded_domains"], 0)
+            sample = gaps["unmatched_samples"][0]
             self.assertEqual(sample["domain"], "core.example")
             self.assertEqual(sample["rule"], "no-company-evidence")
             self.assertIn("tier", sample)
@@ -645,6 +739,55 @@ class PipelineTests(unittest.TestCase):
                 warning["type"] == "exact_pitch_share"
                 for warning in report["warnings"]
             )
+        )
+
+    def test_exact_pitch_capacity_uses_integer_template_floor(self) -> None:
+        campaign = load_campaign(
+            ROOT / "campaigns" / "examples" / "scale-olympus.json"
+        )
+        campaign.data["personalization"]["angles"][0]["templates"] = campaign.data[
+            "personalization"
+        ]["angles"][0]["templates"][:3]
+        campaign.data["quality"].update(
+            {
+                "min_rows": 44,
+                "max_opening_share": 1.0,
+                "max_exact_pitch_share": 0.1,
+                "max_cta_share": 1.0,
+                "max_offer_line_share": 1.0,
+                "max_buyer_phrase_share": None,
+            }
+        )
+        rows = []
+        domains = []
+        for index in range(44):
+            rows.append(
+                {
+                    "personalization_status": "ready",
+                    "personalized_pitch": (
+                        "Shared approved pitch" if index < 16 else f"Pitch {index}"
+                    ),
+                    "personalization_angle": "buyer-conversation-angle",
+                    "personalization_buyer_phrase": "qualified buyers",
+                    "personalization_cta": f"CTA {index}",
+                    "personalization_offer_line": f"Offer line {index}",
+                    "personalization_quality_flags": "",
+                }
+            )
+            domains.append(f"company-{index}.example")
+
+        report = _apply_batch_quality(rows, domains, campaign)
+
+        warning = next(
+            item
+            for item in report["warnings"]
+            if item["type"] == "exact_pitch_share"
+        )
+        self.assertEqual(warning["count"], 16)
+        self.assertEqual(warning["flagged"], 1)
+        self.assertEqual(
+            sum(row["personalization_status"] == "review" for row in rows),
+            1,
         )
 
     def test_batch_quality_demotes_only_the_overflow(self) -> None:

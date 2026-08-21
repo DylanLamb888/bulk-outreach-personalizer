@@ -50,7 +50,7 @@
 - Exact-pitch concentration checks with a template-capacity floor, preventing impossible thresholds from sending balanced copy to review
 - Overflow-only batch repetition routing: rows within a share cap stay ready and only the deterministic over-cap overflow moves to review
 - Campaign-level blocked evidence phrases filtered before candidate selection
-- Focus-gap manifest reporting with per-domain evidence samples
+- Focus-gap manifest reporting with separate unmatched and intentional-exclusion samples
 - Cache pruning via `--prune-cache`
 - Per-row containment of title-hook gaps and fail-closed empty-subject and blank-company-name handling
 

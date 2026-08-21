@@ -117,7 +117,7 @@ Firecrawl results have their own successful and negative local caches. The manif
 
 ## Quality gate
 
-Upload only rows with `outreach_status=ready`. Inspect `review` rows before use. Excluded rows intentionally contain no send-ready personalization. When several eligible contacts share a company domain, only the strongest contact remains ready and later contacts are ranked for later waves. For batches above the configured minimum size, repeated openings, exact pitches, offer lines, or CTAs move the deterministic over-cap overflow of affected rows to review while rows within the cap stay ready; buyer-phrase concentration can be disabled for a deliberately narrow segment. The manifest's `focus_gaps` object lists unmatched or excluded domains with their evidence so focus rules can be iterated without mining the audit CSV.
+Upload only rows with `outreach_status=ready`. Inspect `review` rows before use. Excluded rows intentionally contain no send-ready personalization. When several eligible contacts share a company domain, only the strongest contact remains ready and later contacts are ranked for later waves. For batches above the configured minimum size, repeated openings, exact pitches, offer lines, or CTAs move the deterministic over-cap overflow of affected rows to review while rows within the cap stay ready; buyer-phrase concentration can be disabled for a deliberately narrow segment. The manifest's `focus_gaps` object reports unmatched domains separately from intentional exclusions so focus rules can be iterated without mining the audit CSV.
 
 ```bash
 env PYTHONPATH=src python3 -B -m unittest discover -s tests -v

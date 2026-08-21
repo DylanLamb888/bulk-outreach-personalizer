@@ -72,7 +72,7 @@ Every output receives a JSON manifest containing:
 - script-test cohort counts across unique rendered companies;
 - copy-quality evaluation, warning counts, and flagged-row counts;
 - opening, exact-pitch, buyer-phrase, offer-line, and CTA concentration warnings, each reporting `count` (all affected domains) and `flagged` (the deterministic over-cap overflow demoted to review);
-- a `focus_gaps` object with the number of unmatched or excluded-tier domains and up to 25 per-domain evidence samples for focus-rule iteration;
+- a `focus_gaps` object with separate unmatched and intentionally excluded domain counts, plus up to 25 evidence samples for each group;
 - the exact non-secret run settings.
 - immutable copies and hashes of the campaign JSON and focus CSV used for the run.
 
