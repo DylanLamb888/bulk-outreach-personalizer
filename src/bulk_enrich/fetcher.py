@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import codecs
 import ipaddress
 import socket
 import threading
@@ -96,6 +97,17 @@ def validate_public_url(url: str) -> None:
         ip_text = address[4][0]
         if not ipaddress.ip_address(ip_text).is_global:
             raise UnsafeURLError("hostname resolves to a non-public IP address")
+
+
+def resolve_charset(value: str | None) -> str:
+    """Return a decodable charset label, falling back to UTF-8 for unknown ones."""
+    if not value:
+        return "utf-8"
+    try:
+        codecs.lookup(value)
+    except LookupError:
+        return "utf-8"
+    return value
 
 
 class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -207,7 +219,7 @@ class HttpFetcher:
                         response.headers.get("Content-Encoding", ""),
                         self.settings.max_response_bytes,
                     )
-                    charset = response.headers.get_content_charset() or "utf-8"
+                    charset = resolve_charset(response.headers.get_content_charset())
                     body = payload.decode(charset, errors="replace")
                     result = FetchResult(
                         url=url,

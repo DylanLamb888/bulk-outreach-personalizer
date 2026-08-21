@@ -10,6 +10,7 @@ from bulk_enrich.fetcher import (
     HttpFetcher,
     UnsafeURLError,
     decode_http_body,
+    resolve_charset,
     validate_public_url,
 )
 from bulk_enrich.models import FetchResult
@@ -22,6 +23,12 @@ class FetcherTests(unittest.TestCase):
             decode_http_body(payload, "gzip", 16),
             b"website evidence",
         )
+
+    def test_resolves_unknown_charset_to_utf8(self) -> None:
+        self.assertEqual(resolve_charset("utf8mb4"), "utf-8")
+        self.assertEqual(resolve_charset(None), "utf-8")
+        self.assertEqual(resolve_charset(""), "utf-8")
+        self.assertEqual(resolve_charset("ISO-8859-1"), "ISO-8859-1")
 
     def test_blocks_private_network_targets(self) -> None:
         with self.assertRaises(UnsafeURLError):
