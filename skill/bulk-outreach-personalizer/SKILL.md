@@ -16,9 +16,10 @@ Resolve the repository root as two directories above this `SKILL.md`, including 
 3. Copy both `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`. Rename both, point `personalization.focus_rules_file` at the adjacent CSV, and add only approved qualification rules, offer claims, restrictions, sender, offer-line variants, CTA variants, and copy.
 4. Run `--validate-only` and report row count, detected qualification columns, missing verification values, duplicate emails, unique domains, duplicate-domain savings, rule tiers, and campaign status.
 5. Run a small test with `--allow-test-campaign`; inspect company, contact, email, copy, and final outreach statuses alongside their rules, evidence, reasons, and final emails. Include unseen holdout and adjacent-negative examples.
-6. Do not mark a campaign `approved` without the user's qualification and copy approval.
-7. Run the full list with separate audit, ready, and review outputs. Report `ready`, `review`, `excluded`, and `error` counts plus duplicate exclusions and later-wave company contacts.
-8. Treat only `outreach_status=ready` rows as upload-ready. The ready file must contain no more than one contact per company domain; additional eligible contacts belong in review for later waves. Never upload or send automatically.
+6. Review the manifest's `focus_gaps` samples. Add or adjust focus rules for genuinely in-market domains that went unmatched, put site-specific junk sentences in `personalization.blocked_evidence_phrases`, and re-run the test; cached pages make re-runs cheap.
+7. Do not mark a campaign `approved` without the user's qualification and copy approval.
+8. Run the full list with separate audit, ready, and review outputs. Report `ready`, `review`, `excluded`, and `error` counts plus duplicate exclusions and later-wave company contacts.
+9. Treat only `outreach_status=ready` rows as upload-ready. The ready file must contain no more than one contact per company domain; additional eligible contacts belong in review for later waves. Never upload or send automatically.
 
 When configured, the engine uses input-CSV company intelligence only when first-party website evidence is unavailable. A readable website with no campaign match is excluded rather than rescued by CSV enrichment. CSV-only company evidence must map to the same rule in at least two approved fields and remains review-only. The audit source must remain `input:<header>` so website and supplied-data evidence are never confused.
 

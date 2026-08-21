@@ -29,8 +29,8 @@ The engine fetches each unique public company domain once, caches the result, ex
 - even deterministic offer-line and CTA distribution across each batch;
 - conversational greeting and subject-safe company-name cleanup;
 - review-only CSV fallbacks used only when first-party evidence is unavailable and two approved fields agree;
-- campaign-level banned phrases, word limits, and source-copy overlap limits;
-- batch repetition QA for openings, exact pitches, buyer phrases, offer lines, and CTAs across unique domains;
+- campaign-level banned phrases, blocked evidence phrases, word limits, and source-copy overlap limits;
+- batch repetition QA for openings, exact pitches, buyer phrases, offer lines, and CTAs across unique domains, demoting only the deterministic over-cap overflow;
 - a hard copy gate that rejects em dashes from configured or rendered outreach;
 - editable title-to-hook rules;
 - separate copy status and final `ready`, `review`, `excluded`, or `error` outreach status;
@@ -95,9 +95,9 @@ python scripts/enrich.py \
   --concurrency 24
 ```
 
-The audit output preserves every original row and appends evidence, copy, gate decisions, and reasons. `--ready-output` contains only final `outreach_status=ready` rows; `--review-output` contains reviewable rows with rendered copy. Excluded rows remain auditable but their send copy is blank. The manifest and exact campaign/focus snapshots are written beside the audit CSV.
+The audit output preserves every original row and appends evidence, copy, gate decisions, and reasons. `--ready-output` contains only final `outreach_status=ready` rows; `--review-output` contains reviewable rows (rendered copy where personalisation succeeded; `low_confidence_action: "blank"` rows carry evidence only). Excluded rows remain auditable but their send copy is blank. The manifest and exact campaign/focus snapshots are written beside the audit CSV.
 
-The default cache lives under `var/cache/` for seven days. Re-running the same domains uses the extracted-signal cache and normally makes no HTTP requests. Use `--refresh-cache` only when fresh website evidence is required.
+The default cache lives under `var/cache/` for seven days. Re-running the same domains uses the extracted-signal cache and normally makes no HTTP requests. Use `--refresh-cache` only when fresh website evidence is required, and `--prune-cache` to delete entries older than `--cache-ttl-hours` so the cache directory cannot grow without bound.
 
 ## Optional Firecrawl fallback
 
@@ -117,7 +117,7 @@ Firecrawl results have their own successful and negative local caches. The manif
 
 ## Quality gate
 
-Upload only rows with `outreach_status=ready`. Inspect `review` rows before use. Excluded rows intentionally contain no send-ready personalization. When several eligible contacts share a company domain, only the strongest contact remains ready and later contacts are ranked for later waves. For batches above the configured minimum size, repeated openings, exact pitches, offer lines, or CTAs can move affected rows to review; buyer-phrase concentration can be disabled for a deliberately narrow segment.
+Upload only rows with `outreach_status=ready`. Inspect `review` rows before use. Excluded rows intentionally contain no send-ready personalization. When several eligible contacts share a company domain, only the strongest contact remains ready and later contacts are ranked for later waves. For batches above the configured minimum size, repeated openings, exact pitches, offer lines, or CTAs move the deterministic over-cap overflow of affected rows to review while rows within the cap stay ready; buyer-phrase concentration can be disabled for a deliberately narrow segment. The manifest's `focus_gaps` object lists unmatched or excluded domains with their evidence so focus rules can be iterated without mining the audit CSV.
 
 ```bash
 env PYTHONPATH=src python3 -B -m unittest discover -s tests -v

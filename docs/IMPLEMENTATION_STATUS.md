@@ -48,6 +48,11 @@
 - Fail-closed first-party precedence: CSV evidence is considered only when the website is unavailable
 - Buyer-phrase, offer-line, and CTA concentration checks in batch QA
 - Exact-pitch concentration checks with a template-capacity floor, preventing impossible thresholds from sending balanced copy to review
+- Overflow-only batch repetition routing: rows within a share cap stay ready and only the deterministic over-cap overflow moves to review
+- Campaign-level blocked evidence phrases filtered before candidate selection
+- Focus-gap manifest reporting with per-domain evidence samples
+- Cache pruning via `--prune-cache`
+- Per-row containment of title-hook gaps and fail-closed empty-subject and blank-company-name handling
 
 ## Deliberate boundaries
 
@@ -60,5 +65,8 @@
 - Client offer claims and copy still require human approval before production use
 - Market-specific categories are configuration, not engine behaviour; each campaign declares its own adjacent focus-rule CSV
 - CSV-only company evidence is review-only and requires two approved fields to agree on one rule
+- robots.txt is not consulted; the engine fetches at most a few public pages per domain and the operator owns crawl-policy decisions
+- Public-IP validation resolves DNS separately from the connection; the resulting rebinding window is an accepted risk for this outbound-only threat model
+- Balanced CTA and offer-line assignment is deterministic per identical batch; changing the batch's rendered-domain set re-balances assignments across it
 
 The engine can later accept optional API-backed fetch adapters without changing the campaign or CSV output contract.

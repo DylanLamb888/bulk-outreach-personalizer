@@ -11,6 +11,7 @@ Each campaign defines:
 - `personalization.objective`: human-readable campaign intent;
 - `personalization.focus_rules_file`: campaign-relative path to the market-specific mapping CSV;
 - `personalization.banned_phrases`: phrases rejected in configured or rendered copy;
+- `personalization.blocked_evidence_phrases`: optional site-specific junk sentences that must never become company evidence (checked case-insensitively against candidate evidence before selection);
 - `personalization.angles`: signal types mapped to approved subject/pitch pairs;
 - `personalization.min_confidence`: threshold for a `ready` row;
 - `personalization.low_confidence_action`: render for `review` or leave `blank`;
@@ -73,6 +74,8 @@ The repository's ignored `.env` can set `FIRECRAWL_API_URL=http://localhost:3002
 ## Output review
 
 The output keeps original rows and columns. Audit each line through company, contact, email, copy, and final outreach decisions. Only `outreach_status=ready` rows enter the ready output; review rows retain copy, while excluded rows keep evidence and reasons but blank send copy. The manifest records content-addressed, immutable snapshots and hashes of the campaign and focus rules.
+
+The manifest's `focus_gaps` object lists unmatched or excluded-tier domains with up to 25 evidence samples. Use it after each test run to decide which focus rules to add and which junk sentences to block. Batch-quality warnings report `count` (all domains sharing the value) and `flagged` (the deterministic over-cap overflow demoted to review); rows within the cap stay ready. Pass `--prune-cache` to delete cache entries older than `--cache-ttl-hours` before a run.
 
 Company-contact sequencing ranks eligible contacts within each normalized company domain using qualification status, campaign title priority, configured seniority order, and original input order. Only rank 1 can remain ready. Later ranks retain their personalised copy but move to review with an explicit wave reason.
 
