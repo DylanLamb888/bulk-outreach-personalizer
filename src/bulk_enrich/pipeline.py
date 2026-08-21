@@ -786,6 +786,19 @@ def _opening_key(value: str, word_limit: int) -> str:
     return " ".join(words[:word_limit])
 
 
+def _overflow_domains(
+    kind: str, value: str, affected: set[str], allowed: int
+) -> tuple[str, ...]:
+    """Deterministically pick the domains beyond a share cap for review routing."""
+    ordered = sorted(
+        affected,
+        key=lambda domain: hashlib.sha256(
+            f"quality-overflow:{kind}:{value}:{domain}".encode("utf-8")
+        ).hexdigest(),
+    )
+    return tuple(ordered[max(allowed, 1):])
+
+
 def _apply_batch_quality(
     rows: list[dict[str, str]],
     domains: list[str],
@@ -837,13 +850,22 @@ def _apply_batch_quality(
     for opening, affected in sorted(opening_domains.items()):
         share = len(affected) / total
         if share > float(quality["max_opening_share"]):
+            allowed = int(total * float(quality["max_opening_share"]))
+            overflow = _overflow_domains("opening", opening, affected, allowed)
             message = (
-                f"opening '{opening}' appears on {share:.1%} of rendered domains"
+                f"opening '{opening}' appears on {share:.1%} of rendered domains; "
+                "holding the overflow for review"
             )
             warnings.append(
-                {"type": "opening_share", "opening": opening, "count": len(affected), "share": round(share, 4)}
+                {
+                    "type": "opening_share",
+                    "opening": opening,
+                    "count": len(affected),
+                    "share": round(share, 4),
+                    "flagged": len(overflow),
+                }
             )
-            for domain in affected:
+            for domain in overflow:
                 flags_by_domain.setdefault(domain, []).append(message)
 
     angle_domain_counts = Counter(
@@ -867,7 +889,12 @@ def _apply_batch_quality(
             float(quality["max_exact_pitch_share"]), balanced_floor
         )
         if len(affected) > 1 and share > effective_limit:
-            message = f"exact pitch appears on {share:.1%} of rendered domains"
+            allowed = int(total * effective_limit)
+            overflow = _overflow_domains("exact-pitch", pitch, affected, allowed)
+            message = (
+                f"exact pitch appears on {share:.1%} of rendered domains; "
+                "holding the overflow for review"
+            )
             warnings.append(
                 {
                     "type": "exact_pitch_share",
@@ -875,9 +902,10 @@ def _apply_batch_quality(
                     "share": round(share, 4),
                     "configured_limit": quality["max_exact_pitch_share"],
                     "effective_limit": round(effective_limit, 4),
+                    "flagged": len(overflow),
                 }
             )
-            for domain in affected:
+            for domain in overflow:
                 flags_by_domain.setdefault(domain, []).append(message)
 
     buyer_phrase_limit = quality["max_buyer_phrase_share"]
@@ -885,9 +913,13 @@ def _apply_batch_quality(
         for buyer_phrase, affected in sorted(buyer_phrase_domains.items()):
             share = len(affected) / total
             if share > float(buyer_phrase_limit):
+                allowed = int(total * float(buyer_phrase_limit))
+                overflow = _overflow_domains(
+                    "buyer-phrase", buyer_phrase, affected, allowed
+                )
                 message = (
                     f"buyer phrase '{buyer_phrase}' appears on {share:.1%} "
-                    "of rendered domains"
+                    "of rendered domains; holding the overflow for review"
                 )
                 warnings.append(
                     {
@@ -895,31 +927,41 @@ def _apply_batch_quality(
                         "buyer_phrase": buyer_phrase,
                         "count": len(affected),
                         "share": round(share, 4),
+                        "flagged": len(overflow),
                     }
                 )
-                for domain in affected:
+                for domain in overflow:
                     flags_by_domain.setdefault(domain, []).append(message)
 
     for cta, affected in sorted(cta_domains.items()):
         share = len(affected) / total
         if share > float(quality["max_cta_share"]):
-            message = f"CTA '{cta}' appears on {share:.1%} of rendered domains"
+            allowed = int(total * float(quality["max_cta_share"]))
+            overflow = _overflow_domains("cta", cta, affected, allowed)
+            message = (
+                f"CTA '{cta}' appears on {share:.1%} of rendered domains; "
+                "holding the overflow for review"
+            )
             warnings.append(
                 {
                     "type": "cta_share",
                     "cta": cta,
                     "count": len(affected),
                     "share": round(share, 4),
+                    "flagged": len(overflow),
                 }
             )
-            for domain in affected:
+            for domain in overflow:
                 flags_by_domain.setdefault(domain, []).append(message)
 
     for offer_line, affected in sorted(offer_line_domains.items()):
         share = len(affected) / total
         if share > float(quality["max_offer_line_share"]):
+            allowed = int(total * float(quality["max_offer_line_share"]))
+            overflow = _overflow_domains("offer-line", offer_line, affected, allowed)
             message = (
-                f"offer line '{offer_line}' appears on {share:.1%} of rendered domains"
+                f"offer line '{offer_line}' appears on {share:.1%} of rendered "
+                "domains; holding the overflow for review"
             )
             warnings.append(
                 {
@@ -927,9 +969,10 @@ def _apply_batch_quality(
                     "offer_line": offer_line,
                     "count": len(affected),
                     "share": round(share, 4),
+                    "flagged": len(overflow),
                 }
             )
-            for domain in affected:
+            for domain in overflow:
                 flags_by_domain.setdefault(domain, []).append(message)
 
     flagged_rows = 0

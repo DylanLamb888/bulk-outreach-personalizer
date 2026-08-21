@@ -580,6 +580,55 @@ class PipelineTests(unittest.TestCase):
             )
         )
 
+    def test_batch_quality_demotes_only_the_overflow(self) -> None:
+        def build_batch() -> tuple[list[dict[str, str]], list[str]]:
+            rows: list[dict[str, str]] = []
+            domains: list[str] = []
+            for index in range(10):
+                pitch = (
+                    "Could a campaign start more conversations here?"
+                    if index < 6
+                    else f"Different opening number {index} for this domain?"
+                )
+                rows.append(
+                    {
+                        "personalized_pitch": pitch,
+                        "personalization_status": "ready",
+                        "personalization_quality_flags": "",
+                    }
+                )
+                domains.append(f"domain{index}.example")
+            return rows, domains
+
+        campaign = load_campaign(ROOT / "campaigns" / "campaign-template.json")
+        campaign.data["quality"]["min_rows"] = 10
+
+        rows, domains = build_batch()
+        report = _apply_batch_quality(rows, domains, campaign)
+
+        flagged = [row for row in rows if row["personalization_quality_flags"]]
+        demoted = [row for row in rows if row["personalization_status"] == "review"]
+        # 6 of 10 domains share the opening; the 0.45 cap allows 4, so only the
+        # 2 overflow rows are flagged and demoted.
+        self.assertEqual(len(flagged), 2)
+        self.assertEqual(len(demoted), 2)
+        self.assertEqual(report["flagged_rows"], 2)
+        opening_warnings = [
+            warning
+            for warning in report["warnings"]
+            if warning["type"] == "opening_share"
+        ]
+        self.assertEqual(len(opening_warnings), 1)
+        self.assertEqual(opening_warnings[0]["count"], 6)
+        self.assertEqual(opening_warnings[0]["flagged"], 2)
+
+        repeat_rows, repeat_domains = build_batch()
+        _apply_batch_quality(repeat_rows, repeat_domains, campaign)
+        self.assertEqual(
+            [row["personalization_status"] for row in rows],
+            [row["personalization_status"] for row in repeat_rows],
+        )
+
     def test_offer_line_selection_prefers_an_exact_focus_rule(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             payload = json.loads(
