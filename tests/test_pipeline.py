@@ -19,6 +19,7 @@ from bulk_enrich.pipeline import (
     _balanced_offer_lines,
     _balanced_offer_lines_for_rendered_domains,
     _build_copy,
+    _candidate_facts,
     _clean_first_name,
     _immutable_snapshot,
     _select_company_candidate,
@@ -223,6 +224,41 @@ class PipelineTests(unittest.TestCase):
             self.assertTrue(
                 Path(manifest["settings"]["commercial_focus_snapshot_path"]).is_file()
             )
+
+    def test_candidate_facts_drop_blocked_evidence(self) -> None:
+        campaign = load_campaign(ROOT / "campaigns" / "campaign-template.json")
+        campaign.data["personalization"]["blocked_evidence_phrases"] = [
+            "works with the trade community"
+        ]
+        signal = SiteSignal(
+            domain="example.com",
+            observation="",
+            evidence="",
+            source_url="https://example.com/",
+            confidence=0.9,
+            status="ok",
+            facts=(
+                CompanyFact(
+                    signal_type="service",
+                    focus="the trade community programme",
+                    observation="your team works with the trade community",
+                    evidence="Through this program, CBP works with the trade community",
+                    source_url="https://example.com/",
+                    confidence=0.9,
+                ),
+                CompanyFact(
+                    signal_type="service",
+                    focus="customs brokerage for importers",
+                    observation="your team provides customs brokerage for importers",
+                    evidence="We provide customs brokerage for importers",
+                    source_url="https://example.com/about",
+                    confidence=0.85,
+                ),
+            ),
+        )
+        facts = _candidate_facts(signal, {}, campaign)
+        self.assertEqual(len(facts), 1)
+        self.assertIn("customs brokerage", facts[0].evidence)
 
     def test_title_hook_gap_fails_only_the_row(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

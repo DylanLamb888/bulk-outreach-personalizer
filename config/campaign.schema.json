@@ -235,6 +235,11 @@
           "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true
         },
+        "blocked_evidence_phrases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
         "row_fallback": {
           "type": "object",
           "additionalProperties": false,

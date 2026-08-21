@@ -24,9 +24,6 @@ _BLOCKED_PHRASES = (
     "contact us today",
     "learn more",
     "cookies help us",
-    "through this program, cbp works with the trade community",
-    "apply to the program and work with cbp",
-    "application process is easy and it is done online",
 )
 _PROMOTIONAL_PHRASES = (
     "world-leading",
@@ -407,7 +404,7 @@ def normalize_company_signal(value: str) -> NormalizedCompanySignal:
         )
 
     lowered = text[:1].lower() + text[1:] if text else text
-    focus = re.sub(r"\bsale\s+of\s+pianos\b", "piano sales", lowered, flags=re.IGNORECASE)
+    focus = lowered
     return NormalizedCompanySignal(
         signal_type="specialism",
         focus=_shorten_clause(focus),

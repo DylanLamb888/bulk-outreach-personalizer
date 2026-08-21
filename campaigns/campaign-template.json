@@ -101,6 +101,7 @@
       "i'll cut the fluff",
       "2 things // checking in"
     ],
+    "blocked_evidence_phrases": [],
     "row_fallback": {
       "enabled": true,
       "fields": [

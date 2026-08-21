@@ -487,6 +487,16 @@ def _candidate_facts(
         candidates.extend(signal.facts or (_primary_fact(signal),))
     candidates.extend(facts_from_row(row, campaign.row_fallback_fields))
 
+    blocked = campaign.blocked_evidence_phrases
+    if blocked:
+        candidates = [
+            candidate
+            for candidate in candidates
+            if not any(
+                phrase in candidate.evidence.casefold() for phrase in blocked
+            )
+        ]
+
     unique: list[CompanyFact] = []
     seen: set[tuple[str, str]] = set()
     for candidate in candidates:

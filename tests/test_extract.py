@@ -48,8 +48,6 @@ class ExtractTests(unittest.TestCase):
             <html><body>
               <p>(see Entry Type 86 page for more info)</p>
               <p>Cookies help us improve your experience and analyze traffic</p>
-              <p>Through this program, CBP works with the trade community to strengthen international supply chains</p>
-              <p>Companies can apply to the program and work with CBP because the application process is easy and it is done online</p>
               <p>We help bring clarity to the complexity of int</p>
               <p>Download our USMCA certification guide in PDF format</p>
               <p>We provide full-service customs brokerage across the United States</p>
@@ -97,7 +95,7 @@ class ExtractTests(unittest.TestCase):
             ),
             "World-class restoration, repair, refinishing, and sale of pianos": (
                 "specialism",
-                "restoration, repair, refinishing, and piano sales",
+                "restoration, repair, refinishing, and sale of pianos",
             ),
         }
         for evidence, expected in examples.items():

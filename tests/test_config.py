@@ -74,6 +74,21 @@ class CampaignConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(CampaignConfigError, "banned phrase"):
                 load_campaign(path)
 
+    def test_blocked_evidence_phrases_must_be_strings(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["personalization"]["blocked_evidence_phrases"] = [1]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "campaign.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(
+                CampaignConfigError, "blocked_evidence_phrases"
+            ):
+                load_campaign(path)
+
+    def test_blocked_evidence_phrases_default_to_empty(self) -> None:
+        config = load_campaign(ROOT / "campaigns" / "campaign-template.json")
+        self.assertEqual(config.blocked_evidence_phrases, ())
+
     def test_missing_fallback_angle_is_rejected(self) -> None:
         payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
         payload["personalization"]["angles"][0]["signal_types"] = ["service"]

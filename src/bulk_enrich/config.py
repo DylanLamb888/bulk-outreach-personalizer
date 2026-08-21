@@ -83,6 +83,11 @@ class CampaignConfig:
         )
 
     @property
+    def blocked_evidence_phrases(self) -> tuple[str, ...]:
+        configured = self.data["personalization"].get("blocked_evidence_phrases", [])
+        return tuple(str(item).casefold() for item in configured)
+
+    @property
     def focus_rules_path(self) -> Path:
         """Resolve the campaign's niche mapping table relative to its JSON file."""
         configured = Path(str(self.data["personalization"]["focus_rules_file"])).expanduser()
@@ -484,6 +489,13 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         allow_empty=True,
         label="personalization.banned_phrases",
     )
+    if "blocked_evidence_phrases" in personalization:
+        _require_string_list(
+            personalization,
+            "blocked_evidence_phrases",
+            allow_empty=True,
+            label="personalization.blocked_evidence_phrases",
+        )
 
     row_fallback = personalization.get("row_fallback")
     seen_headers: set[str] = set()
