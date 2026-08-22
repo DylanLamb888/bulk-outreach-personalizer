@@ -16,11 +16,14 @@ Each campaign defines:
 - `personalization.min_confidence`: threshold for a `ready` row;
 - `personalization.low_confidence_action`: render for `review` or leave `blank`;
 - `personalization.row_fallback`: ordered input CSV headers and confidence scores used only when first-party website evidence is unavailable;
+- `personalization.fallback_copy`: optional campaign-approved title fallback for broad outreach campaigns;
 - `quality`: subject, pitch, offer-line, CTA, focus, source-overlap, full-email, and batch-repetition gates;
 - `email`: subject and complete body template;
 - `output.append_fields`: required audit and upload columns.
 
 Files under `campaigns/examples/` are tests. Put client-specific files in `campaigns/local/`; the folder is excluded from Git.
+
+The input must contain email, first name, and company name columns. A company domain or website is strongly recommended for first-party personalisation, but it may be absent when an approved broad campaign enables title fallback. Strict campaigns will exclude rows without company evidence. Job title is required by the contact gate; email-verification status is optional only when the campaign permits syntax validation or review.
 
 ## Merge fields
 
@@ -39,6 +42,8 @@ The CSV declared by `personalization.focus_rules_file` maps evidence to a short 
 
 `personalization.row_fallback.fields` is an ordered list of `{header, confidence}` objects. Missing columns are ignored. CSV fields are considered only when first-party website evidence is unavailable. At least the configured number of approved fields must match the same focus rule; the result remains review-only. A selected fallback records `input:<header>` as its source and retains the original cell as evidence.
 
+`personalization.fallback_copy` is disabled by default. When enabled, it can render approved persona-based templates for unmatched companies, accept one mapped CSV company field, or promote review-level company evidence. `allow_explicit_company_exclusions` is a separate opt-in for broad campaigns and must remain false when the campaign has genuine off-target company types. Title fallback records `personalization_signal_type=title`, `personalization_focus_rule=title-fallback`, `company_fit_tier=fallback`, and `personalization_source=input:Job title`. Contact and email qualification still apply. When no domain value exists, the engine uses a hashed company-name identity for deterministic variation, batch QA, and one-contact-per-company sequencing; it never treats that identity as website evidence.
+
 `offer.cta_variants` contains approved `{id, text}` pairs. The engine orders unique domains by a stable hash and assigns variants round-robin, independently from the pitch template. This keeps an identical batch reproducible while preventing one CTA from dominating. A variant can declare `focus_rules`; exact matches take precedence over the required `*` fallback. If the array is absent or empty, the engine uses `offer.cta`. The audit CSV records both the selected ID and rendered CTA.
 
 `offer.risk_reversal_variants` follows the same deterministic distribution. Keep each line short and natural, vary the sentence structure rather than swapping synonyms, and describe only the approved commercial model. A variant can declare `focus_rules` to target one or more campaign focus-rule IDs. Exact matches take precedence over the required `*` fallback. If the array is absent or empty, the engine uses `offer.risk_reversal`. The audit CSV records the selected ID and exact rendered line. Use `personalization_offer_variant` as the script-test cohort, and use the manifest's `script_test.cohort_counts` to verify the distribution.
@@ -48,25 +53,25 @@ The CSV declared by `personalization.focus_rules_file` maps evidence to a short 
 Validation:
 
 ```bash
-python scripts/enrich.py --input LEADS.csv --output OUTPUT.csv --campaign CAMPAIGN.json --validate-only
+python <repository-root>/scripts/enrich.py --input LEADS.csv --output OUTPUT.csv --campaign CAMPAIGN.json --validate-only
 ```
 
 Controlled test:
 
 ```bash
-python scripts/enrich.py --input TEST.csv --output OUTPUT.csv --campaign CAMPAIGN.json --allow-test-campaign
+python <repository-root>/scripts/enrich.py --input TEST.csv --output OUTPUT.csv --campaign CAMPAIGN.json --allow-test-campaign
 ```
 
 Production:
 
 ```bash
-python scripts/enrich.py --input LEADS.csv --output AUDIT.csv --ready-output SMARTLEAD-READY.csv --review-output REVIEW.csv --campaign APPROVED.json --concurrency 24
+python <repository-root>/scripts/enrich.py --input LEADS.csv --output AUDIT.csv --ready-output SMARTLEAD-READY.csv --review-output REVIEW.csv --campaign APPROVED.json --concurrency 24
 ```
 
 Optional Firecrawl fallback for failed or weak pages:
 
 ```bash
-python scripts/enrich.py --input LEADS.csv --output AUDIT.csv --campaign APPROVED.json --firecrawl-fallback
+python <repository-root>/scripts/enrich.py --input LEADS.csv --output AUDIT.csv --campaign APPROVED.json --firecrawl-fallback
 ```
 
 The repository's ignored `.env` can set `FIRECRAWL_API_URL=http://localhost:3002`; shell variables take precedence. For hosted Firecrawl, leave the local URL unset and configure `FIRECRAWL_API_KEY` in the shell environment. Firecrawl is never called for a page whose direct extraction is already strong. Its local cache and manifest counters are separate from direct HTTP.

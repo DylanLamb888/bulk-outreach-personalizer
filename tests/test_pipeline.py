@@ -21,12 +21,14 @@ from bulk_enrich.pipeline import (
     _build_copy,
     _candidate_facts,
     _clean_first_name,
+    _fallback_company_decision,
     _immutable_snapshot,
     _select_company_candidate,
     _sequence_company_contacts,
     _short_company_name,
     run_enrichment,
 )
+from bulk_enrich.qualification import QualificationResult
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1174,6 +1176,176 @@ class PipelineTests(unittest.TestCase):
                 "private-company owners considering a sale",
             )
             self.assertEqual(row["personalization_error"], "")
+
+    def test_opt_in_title_fallback_renders_an_unmatched_company(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            payload = json.loads(
+                (ROOT / "campaigns" / "examples" / "scale-olympus.json").read_text()
+            )
+            payload["personalization"]["fallback_copy"] = {
+                "enabled": True,
+                "status": "ready",
+                "allow_unmatched_company": True,
+                "allow_single_csv_field": True,
+                "promote_company_review": True,
+                "templates": [
+                    {
+                        "id": "owner-fallback",
+                        "personas": ["owner"],
+                        "subject": "Outbound idea",
+                        "pitch": "Could another source of qualified conversations help?",
+                    },
+                    {
+                        "id": "general-fallback",
+                        "personas": ["*"],
+                        "subject": "Qualified conversations",
+                        "pitch": "Would more qualified conversations be useful right now?",
+                    },
+                ],
+            }
+            campaign_path = tmp_path / "campaign.json"
+            campaign_path.write_text(json.dumps(payload), encoding="utf-8")
+            campaign = load_campaign(campaign_path)
+            input_path = tmp_path / "lead.csv"
+            input_path.write_text(
+                "Email,Email status,First name,Job title,Company name\n"
+                "ana@example.com,VERIFIED,Ana,Founder,Northstar\n",
+                encoding="utf-8",
+            )
+            output = tmp_path / "audit.csv"
+            manifest = run_enrichment(
+                input_path=input_path,
+                output_path=output,
+                campaign=campaign,
+                title_hooks=TitleHookTable.load(ROOT / "config" / "title-hooks.csv"),
+                commercial_focuses=CommercialFocusTable.load(
+                    ROOT / "campaigns" / "examples" / "scale-olympus-focus.csv"
+                ),
+                options=RunOptions(cache_dir=tmp_path / "cache"),
+                domain_enricher=FailedDomainEnricher(),
+            )
+            with output.open("r", encoding="utf-8-sig", newline="") as handle:
+                row = next(csv.DictReader(handle))
+            self.assertEqual(row["company_fit_status"], "qualified")
+            self.assertEqual(row["company_fit_tier"], "fallback")
+            self.assertEqual(row["company_fit_rule"], "title-fallback")
+            self.assertEqual(row["personalization_signal_type"], "title")
+            self.assertEqual(row["personalization_source"], "input:Job title")
+            self.assertEqual(row["personalization_template"], "owner-fallback")
+            self.assertEqual(row["company_contact_status"], "primary")
+            self.assertEqual(row["outreach_status"], "ready")
+            self.assertTrue(row["personalized_email"])
+            self.assertEqual(manifest["domains"]["unique"], 0)
+            self.assertEqual(
+                manifest["script_test"]["unique_rendered_companies"],
+                1,
+            )
+
+    def test_title_fallback_does_not_override_an_explicit_company_exclusion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            payload = json.loads(
+                (ROOT / "campaigns" / "examples" / "scale-olympus.json").read_text()
+            )
+            payload["personalization"]["fallback_copy"] = {
+                "enabled": True,
+                "status": "ready",
+                "allow_unmatched_company": True,
+                "allow_single_csv_field": True,
+                "promote_company_review": True,
+                "templates": [
+                    {
+                        "id": "general-fallback",
+                        "personas": ["*"],
+                        "subject": "Qualified conversations",
+                        "pitch": "Would more qualified conversations be useful right now?",
+                    }
+                ],
+            }
+            campaign_path = tmp_path / "campaign.json"
+            campaign_path.write_text(json.dumps(payload), encoding="utf-8")
+            campaign = load_campaign(campaign_path)
+            input_path = tmp_path / "lead.csv"
+            input_path.write_text(
+                "Email,Email status,First name,Job title,Company name,Website\n"
+                "ana@example.com,VERIFIED,Ana,Founder,Off Niche,off.example\n",
+                encoding="utf-8",
+            )
+            output = tmp_path / "audit.csv"
+            run_enrichment(
+                input_path=input_path,
+                output_path=output,
+                campaign=campaign,
+                title_hooks=TitleHookTable.load(ROOT / "config" / "title-hooks.csv"),
+                commercial_focuses=CommercialFocusTable.load(
+                    ROOT / "campaigns" / "examples" / "scale-olympus-focus.csv"
+                ),
+                options=RunOptions(cache_dir=tmp_path / "cache"),
+                domain_enricher=MappingDomainEnricher(),
+            )
+            with output.open("r", encoding="utf-8-sig", newline="") as handle:
+                row = next(csv.DictReader(handle))
+            self.assertEqual(row["company_fit_status"], "excluded")
+            self.assertEqual(row["company_fit_rule"], "piano-restoration")
+            self.assertEqual(row["outreach_status"], "excluded")
+            self.assertEqual(row["personalized_email"], "")
+
+    def test_campaign_can_explicitly_allow_title_copy_for_excluded_company_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = json.loads(
+                (ROOT / "campaigns" / "examples" / "scale-olympus.json").read_text()
+            )
+            payload["personalization"]["fallback_copy"] = {
+                "enabled": True,
+                "status": "ready",
+                "allow_unmatched_company": True,
+                "allow_single_csv_field": True,
+                "allow_explicit_company_exclusions": True,
+                "promote_company_review": True,
+                "templates": [
+                    {
+                        "id": "general-fallback",
+                        "personas": ["*"],
+                        "subject": "Qualified conversations",
+                        "pitch": "Would more qualified conversations be useful right now?",
+                    }
+                ],
+            }
+            campaign_path = Path(tmp) / "campaign.json"
+            campaign_path.write_text(json.dumps(payload), encoding="utf-8")
+            campaign = load_campaign(campaign_path)
+            fact = CompanyFact(
+                signal_type="service",
+                focus="piano restoration and repair",
+                observation="piano restoration and repair",
+                evidence="piano restoration and repair",
+                source_url="https://off.example/",
+                confidence=0.9,
+            )
+            focus = CommercialFocusResult(
+                source_focus=fact.focus,
+                focus="piano restoration",
+                buyer_phrase="piano owners needing restoration",
+                rule_id="piano-restoration",
+                priority=10,
+                fit_tier="exclude",
+            )
+            decision = _fallback_company_decision(
+                QualificationResult(
+                    status="excluded",
+                    rule="piano-restoration",
+                    reason="company evidence does not match the campaign target",
+                ),
+                fact,
+                focus,
+                campaign,
+            )
+            self.assertIsNotNone(decision)
+            result, basis = decision
+            self.assertEqual(result.status, "qualified")
+            self.assertEqual(result.rule, "title-fallback")
+            self.assertEqual(basis, "title")
 
     def test_batch_repetition_gate_counts_unique_domains_and_marks_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

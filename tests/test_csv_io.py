@@ -35,6 +35,21 @@ class CsvInspectionTests(unittest.TestCase):
             self.assertTrue(summary.email_status_present)
             self.assertEqual(summary.duplicate_email_rows, 1)
 
+    def test_accepts_a_title_only_list_without_a_website_column(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "title-only.csv"
+            path.write_text(
+                "Email,First name,Job title,Company name\n"
+                "ana@example.com,Ana,Founder,Northstar\n",
+                encoding="utf-8",
+            )
+            summary = inspect_csv(path)
+            self.assertEqual(summary.row_count, 1)
+            self.assertEqual(summary.domains_present, 0)
+            self.assertEqual(summary.unique_domain_count, 0)
+            self.assertNotIn("company_domain", summary.column_map)
+            self.assertNotIn("company_website", summary.column_map)
+
 
 if __name__ == "__main__":
     unittest.main()

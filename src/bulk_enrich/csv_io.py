@@ -110,8 +110,6 @@ def load_csv(path: str | Path) -> CSVData:
     mapping = detect_columns(headers)
     required = ("email", "first_name", "company_name")
     missing_headers = [field for field in required if field not in mapping]
-    if not ("company_domain" in mapping or "company_website" in mapping):
-        missing_headers.append("company_domain or company_website")
     if missing_headers:
         raise ValueError("input CSV is missing required columns: " + ", ".join(missing_headers))
 

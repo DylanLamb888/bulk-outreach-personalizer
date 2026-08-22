@@ -9,7 +9,7 @@ The CLI preserves every input column and row order, then appends the campaign's 
 | `personalized_email` | Complete Smartlead/ListKit-ready email |
 | `personalization_angle` | Signal-routed campaign angle ID |
 | `personalization_template` | Exact approved template ID used |
-| `personalization_signal_type` | `product`, `service`, `audience`, `specialism`, or `positioning` |
+| `personalization_signal_type` | `product`, `service`, `audience`, `specialism`, `positioning`, or broad-campaign `title` fallback |
 | `personalization_source_focus` | Original normalized website phrase retained for audit |
 | `personalization_focus` | One compressed commercial category safe for copy |
 | `personalization_buyer_phrase` | Natural buyer description inserted into lead-generation copy |
@@ -26,7 +26,7 @@ The CLI preserves every input column and row order, then appends the campaign's 
 | `personalization_status` | `ready`, `review`, `blank`, or `error` |
 | `personalization_error` | Missing data, weak evidence, fetch, or render issue |
 | `company_fit_status` | `qualified`, `review`, or `excluded` company decision |
-| `company_fit_tier` | Selected `core`, `secondary`, `exclude`, or `none` tier |
+| `company_fit_tier` | Selected `core`, `secondary`, `exclude`, `fallback`, or `none` tier |
 | `company_fit_rule` | Campaign rule responsible for the company decision |
 | `company_fit_source` | First-party URL or approved `input:<header>` evidence source |
 | `company_fit_evidence` | Evidence used for company qualification |

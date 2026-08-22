@@ -260,6 +260,41 @@
             }
           }
         },
+        "fallback_copy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "status", "templates"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "status": { "enum": ["ready", "review"] },
+            "allow_unmatched_company": { "type": "boolean" },
+            "allow_single_csv_field": { "type": "boolean" },
+            "allow_explicit_company_exclusions": { "type": "boolean" },
+            "promote_company_review": { "type": "boolean" },
+            "templates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "personas", "subject", "pitch"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                  },
+                  "personas": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "type": "string", "minLength": 1 },
+                    "uniqueItems": true
+                  },
+                  "subject": { "type": "string", "minLength": 1 },
+                  "pitch": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
         "angles": {
           "type": "array",
           "minItems": 1,

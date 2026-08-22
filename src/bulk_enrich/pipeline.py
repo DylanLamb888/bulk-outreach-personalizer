@@ -103,10 +103,11 @@ class RenderedCopy:
 class _RenderJob:
     row: dict[str, str]
     context: dict[str, object]
-    domain: str
+    assignment_key: str
     signal_type: str
     source_evidence: str
     focus_rule: str
+    angle: CopyAngle | None = None
 
 
 def sha256_file(path: str | Path) -> str:
@@ -337,8 +338,9 @@ def _build_copy(
     focus_rule: str = "",
     cta_variant: CtaVariant | None = None,
     offer_variant: OfferLineVariant | None = None,
+    angle: CopyAngle | None = None,
 ) -> RenderedCopy:
-    angle = _angle_for_signal(campaign, signal_type)
+    angle = angle or _angle_for_signal(campaign, signal_type)
     failures: list[str] = []
     applicable_ctas = _ctas_for_focus_rule(campaign.cta_variants, focus_rule)
     if cta_variant not in applicable_ctas:
@@ -590,6 +592,90 @@ def _select_company_candidate(
     return None, ()
 
 
+def _fallback_company_decision(
+    company_result: QualificationResult,
+    fact: CompanyFact | None,
+    focus: CommercialFocusResult | None,
+    campaign: CampaignConfig,
+) -> tuple[QualificationResult, str] | None:
+    """Return an opt-in fallback, including exclusions only when explicitly allowed."""
+    if not campaign.fallback_copy_enabled:
+        return None
+
+    fallback_status = (
+        "qualified" if campaign.fallback_copy_status == "ready" else "review"
+    )
+    if (
+        company_result.status == "review"
+        and campaign.fallback_promote_company_review
+        and focus is not None
+        and focus.fit_tier != "exclude"
+    ):
+        return (
+            QualificationResult(
+                status=fallback_status,
+                rule=focus.rule_id,
+                reason=(
+                    "campaign permits outreach from review-level company evidence"
+                ),
+            ),
+            "mapped",
+        )
+
+    if company_result.status != "excluded":
+        return None
+    if (
+        focus is not None
+        and focus.fit_tier == "exclude"
+        and focus.rule_id != "generic-compression"
+    ):
+        if not campaign.fallback_allow_explicit_company_exclusions:
+            return None
+        return (
+            QualificationResult(
+                status=fallback_status,
+                rule="title-fallback",
+                reason=(
+                    "campaign permits title-based outreach despite explicit company "
+                    f"rule '{focus.rule_id}'"
+                ),
+            ),
+            "title",
+        )
+    if (
+        fact is not None
+        and focus is not None
+        and fact.source_url.startswith("input:")
+        and focus.rule_id != "generic-compression"
+        and focus.fit_tier != "exclude"
+        and campaign.fallback_allow_single_csv_field
+    ):
+        return (
+            QualificationResult(
+                status=fallback_status,
+                rule=focus.rule_id,
+                reason="campaign permits outreach from one approved CSV company field",
+            ),
+            "mapped",
+        )
+    if (
+        company_result.rule in {"no-company-evidence", "generic-compression"}
+        and campaign.fallback_allow_unmatched_company
+    ):
+        return (
+            QualificationResult(
+                status=fallback_status,
+                rule="title-fallback",
+                reason=(
+                    "campaign permits title-based outreach when company evidence is "
+                    "unmatched"
+                ),
+            ),
+            "title",
+        )
+    return None
+
+
 _COPY_OUTPUT_FIELDS = (
     "personalized_subject",
     "personalized_email",
@@ -769,6 +855,30 @@ def _clean_first_name(value: str) -> str:
     if not cleaned:
         return ""
     return cleaned.split()[0].strip(" ,;:")
+
+
+def _company_assignment_key(
+    row: dict[str, str],
+    domain: str,
+    column_map: dict[str, str],
+) -> str:
+    """Return a stable company key even when the input has no usable website."""
+    if domain:
+        return domain
+    company_header = column_map.get("company_name", "")
+    company_name = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        row.get(company_header, "").casefold(),
+    ).strip()
+    if company_name:
+        identity = f"company-name:{company_name}"
+    else:
+        email_header = column_map.get("email", "")
+        email = normalize_email(row.get(email_header, ""))
+        identity = f"contact:{email}" if email else json.dumps(row, sort_keys=True)
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+    return f"fallback:{digest}"
 
 
 def _short_company_name(value: str, max_words: int = 4) -> str:
@@ -1091,6 +1201,10 @@ def run_enrichment(
         raise ValueError("--output, --ready-output, and --review-output must differ")
 
     domains = [domain_for_row(row, data.column_map) for row in data.rows]
+    company_keys = [
+        _company_assignment_key(row, domain, data.column_map)
+        for row, domain in zip(data.rows, domains, strict=True)
+    ]
     unique_domains = list(dict.fromkeys(domain for domain in domains if domain))
 
     fetcher: HttpFetcher | None = None
@@ -1138,7 +1252,12 @@ def run_enrichment(
     append_fields = list(campaign.data["output"]["append_fields"])
     output_rows: list[dict[str, str]] = []
     render_jobs: list[_RenderJob] = []
-    for row, domain in zip(data.rows, domains, strict=True):
+    for row, domain, company_key in zip(
+        data.rows,
+        domains,
+        company_keys,
+        strict=True,
+    ):
         output_row = dict(row)
         signal = domain_results.get(domain) if domain else None
         context = context_for_row(row, data.column_map)
@@ -1214,6 +1333,9 @@ def run_enrichment(
         fact: CompanyFact | None = None
         commercial_focus: CommercialFocusResult | None = None
         corroborating_fields: tuple[str, ...] = ()
+        fallback_basis = ""
+        fallback_angle: CopyAngle | None = None
+        hook = None
 
         if not company_name:
             errors.append("missing company name")
@@ -1278,10 +1400,67 @@ def run_enrichment(
                         )
                     )
 
+        fallback_decision = _fallback_company_decision(
+            company_result,
+            fact,
+            commercial_focus,
+            campaign,
+        )
+        if fallback_decision is not None and company_name:
+            fallback_company_result, candidate_fallback_basis = fallback_decision
+            if candidate_fallback_basis == "title":
+                title = str(context.get("job_title", "")).strip()
+                try:
+                    hook = title_hooks.match(title)
+                except ValueError as exc:
+                    errors.append(f"title hook: {exc}")
+                if hook is not None:
+                    fallback_templates = campaign.fallback_templates_for_persona(
+                        hook.persona
+                    )
+                    if not fallback_templates:
+                        errors.append(
+                            f"no fallback copy template for persona '{hook.persona}'"
+                        )
+                    else:
+                        company_result = fallback_company_result
+                        fallback_basis = candidate_fallback_basis
+                        errors = []
+                        fact = CompanyFact(
+                            signal_type="title",
+                            focus=title,
+                            observation=f"contact title: {title}",
+                            evidence=title,
+                            source_url="input:Job title",
+                            confidence=0.60,
+                        )
+                        facts = (fact, *facts)
+                        commercial_focus = CommercialFocusResult(
+                            source_focus=title,
+                            focus=hook.persona,
+                            buyer_phrase="",
+                            rule_id="title-fallback",
+                            priority=1_000_001,
+                            fit_tier="core",
+                        )
+                        fallback_angle = CopyAngle(
+                            angle_id="title-fallback",
+                            signal_types=("title",),
+                            templates=fallback_templates,
+                        )
+            else:
+                company_result = fallback_company_result
+                fallback_basis = candidate_fallback_basis
+                errors = []
+
         values.update(
             {
                 "company_fit_status": company_result.status,
-                "company_fit_tier": commercial_focus.fit_tier if commercial_focus else "none",
+                "company_fit_tier": (
+                    "fallback"
+                    if fallback_basis
+                    else commercial_focus.fit_tier if commercial_focus else "none"
+                ),
                 "company_fit_rule": company_result.rule,
                 "company_fit_source": fact.source_url if fact else values["company_fit_source"],
                 "company_fit_evidence": fact.evidence if fact else values["company_fit_evidence"],
@@ -1321,7 +1500,11 @@ def run_enrichment(
             result.status == "excluded"
             for result in (company_result, contact_result, email_result)
         )
-        low_confidence = fact is not None and fact.confidence < campaign.min_confidence
+        low_confidence = (
+            not fallback_basis
+            and fact is not None
+            and fact.confidence < campaign.min_confidence
+        )
         should_render = (
             not gate_excluded
             and fact is not None
@@ -1332,7 +1515,7 @@ def run_enrichment(
                 or campaign.data["personalization"]["low_confidence_action"] == "review"
             )
         )
-        if should_render:
+        if should_render and hook is None:
             title = str(context.get("job_title", ""))
             try:
                 hook = title_hooks.match(title)
@@ -1370,7 +1553,10 @@ def run_enrichment(
                     f"signal confidence {fact.confidence:.2f} is below "
                     f"{campaign.min_confidence:.2f}"
                 )
-            values["personalization_status"] = "review" if low_confidence else "ready"
+            if fallback_basis:
+                values["personalization_status"] = campaign.fallback_copy_status
+            else:
+                values["personalization_status"] = "review" if low_confidence else "ready"
 
         values["personalization_error"] = "; ".join(error for error in errors if error)
         output_row.update(values)
@@ -1380,35 +1566,37 @@ def run_enrichment(
                 _RenderJob(
                     row=output_row,
                     context=context,
-                    domain=domain,
+                    assignment_key=company_key,
                     signal_type=fact.signal_type,
                     source_evidence=fact.evidence,
                     focus_rule=commercial_focus.rule_id,
+                    angle=fallback_angle,
                 )
             )
 
-    domain_focus_rules = [
-        (job.domain, job.focus_rule) for job in render_jobs
+    company_focus_rules = [
+        (job.assignment_key, job.focus_rule) for job in render_jobs
     ]
-    cta_by_domain = _balanced_ctas_for_rendered_domains(
+    cta_by_company = _balanced_ctas_for_rendered_domains(
         campaign.cta_variants,
-        domain_focus_rules,
+        company_focus_rules,
     )
-    offer_line_by_domain = _balanced_offer_lines_for_rendered_domains(
+    offer_line_by_company = _balanced_offer_lines_for_rendered_domains(
         campaign.offer_line_variants,
-        domain_focus_rules,
+        company_focus_rules,
     )
     for job in render_jobs:
         try:
             rendered = _build_copy(
                 campaign,
                 job.context,
-                job.domain,
+                job.assignment_key,
                 job.signal_type,
                 job.source_evidence,
                 focus_rule=job.focus_rule,
-                cta_variant=cta_by_domain[job.domain],
-                offer_variant=offer_line_by_domain[job.domain],
+                cta_variant=cta_by_company[job.assignment_key],
+                offer_variant=offer_line_by_company[job.assignment_key],
+                angle=job.angle,
             )
             job.row["personalized_subject"] = rendered.subject
             job.row[campaign.output_field] = rendered.pitch
@@ -1436,12 +1624,12 @@ def run_enrichment(
         data.column_map["email"],
         campaign,
     )
-    quality_report = _apply_batch_quality(output_rows, domains, campaign)
+    quality_report = _apply_batch_quality(output_rows, company_keys, campaign)
     for row in output_rows:
         _refresh_outreach_status(row)
     sequencing_report = _sequence_company_contacts(
         output_rows,
-        domains,
+        company_keys,
         campaign,
         seniority_header=data.column_map.get("job_seniority", ""),
         title_header=data.column_map.get("job_title", ""),
@@ -1526,13 +1714,13 @@ def run_enrichment(
             if len(excluded_samples) < 25:
                 excluded_samples.append(sample)
     rendered_company_rows: dict[str, dict[str, str]] = {}
-    for row, domain in zip(output_rows, domains, strict=True):
+    for row, company_key in zip(output_rows, company_keys, strict=True):
         if (
-            domain
+            company_key
             and row.get("personalization_offer_variant")
             and row.get("personalization_status") in {"ready", "review"}
         ):
-            rendered_company_rows.setdefault(domain, row)
+            rendered_company_rows.setdefault(company_key, row)
     offer_test_counts = Counter(
         row["personalization_offer_variant"]
         for row in rendered_company_rows.values()

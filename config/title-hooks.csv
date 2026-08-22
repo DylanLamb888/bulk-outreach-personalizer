@@ -2,6 +2,6 @@ priority,title_pattern,persona,hook
 10,owner|founder|co-founder|principal|managing partner,owner,"As an owner, predictable growth and flexibility matter"
 20,chief executive officer|ceo|president|managing director,executive,"At executive level, predictable growth and clear options matter"
 30,chief financial officer|cfo|finance director|controller,finance,"From finance, measurable economics and timing matter"
-40,chief revenue officer|cro|vp sales|head of sales|sales director,sales,"Commercially, predictable access to the right buyers matters"
+40,chief revenue officer|cro|chief commercial officer|chief sales officer|chief growth officer|chief business officer|chief development officer|chief customer officer|vp sales|head of sales|sales director,sales,"Commercially, predictable access to the right buyers matters"
 50,chief marketing officer|cmo|vp marketing|head of marketing|marketing director,marketing,"From marketing, measurable pipeline contribution matters"
 90,.*,general,"In leadership, clear and measurable options matter"

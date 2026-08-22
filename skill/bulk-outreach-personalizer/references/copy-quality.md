@@ -27,8 +27,9 @@ Use website facts inside the commercial question or offer. Do not lead with a se
 - Do not repeat the same opening structure in the personalized pitch and CTA within one email.
 - Prefer low-friction, value-based CTAs that offer something specific. Do not ask for a call unless the campaign explicitly requires that CTA.
 - Include only client-approved claims. Never infer prospect intent, pain, growth plans, sale intent, performance, or customer relationships.
-- Leave the row blank when no rule or complete neutral category can safely express buyer intent.
-- Treat generic compression as audit context only: unmatched evidence is not proof of campaign fit and must be excluded from the ready output.
+- In strict campaigns, leave the row blank when no rule or complete neutral category can safely express buyer intent.
+- In an approved broad campaign, unmatched company evidence may use `personalization.fallback_copy` with a permitted contact-title persona. Keep the language general and relevant to the role; never pretend the title proves a company-specific need.
+- Treat generic compression as audit context only. It is not proof of niche fit unless the campaign explicitly permits broad title fallback.
 - Put overused openings and client-specific exclusions in `banned_phrases`.
 - Keep multiple approved sentence structures per common angle. Select them deterministically by domain and monitor opening frequency across the batch.
 - Do not place several contacts from the same company in one ready file. Keep the strongest contact ready and hold the rest for later waves.

@@ -51,6 +51,14 @@ class RowFallbackField:
 
 
 @dataclass(frozen=True)
+class PersonaFallbackTemplate:
+    template_id: str
+    personas: tuple[str, ...]
+    subject: str
+    pitch: str
+
+
+@dataclass(frozen=True)
 class CampaignConfig:
     path: Path
     data: dict[str, Any]
@@ -204,6 +212,66 @@ class CampaignConfig:
                 confidence=float(item["confidence"]),
             )
             for item in configured["fields"]
+        )
+
+    @property
+    def fallback_copy_enabled(self) -> bool:
+        configured = self.data["personalization"].get("fallback_copy", {})
+        return bool(configured.get("enabled", False))
+
+    @property
+    def fallback_copy_status(self) -> str:
+        configured = self.data["personalization"].get("fallback_copy", {})
+        return str(configured.get("status", "review"))
+
+    @property
+    def fallback_allow_unmatched_company(self) -> bool:
+        configured = self.data["personalization"].get("fallback_copy", {})
+        return bool(configured.get("allow_unmatched_company", False))
+
+    @property
+    def fallback_allow_single_csv_field(self) -> bool:
+        configured = self.data["personalization"].get("fallback_copy", {})
+        return bool(configured.get("allow_single_csv_field", False))
+
+    @property
+    def fallback_allow_explicit_company_exclusions(self) -> bool:
+        configured = self.data["personalization"].get("fallback_copy", {})
+        return bool(configured.get("allow_explicit_company_exclusions", False))
+
+    @property
+    def fallback_promote_company_review(self) -> bool:
+        configured = self.data["personalization"].get("fallback_copy", {})
+        return bool(configured.get("promote_company_review", False))
+
+    @property
+    def fallback_templates(self) -> tuple[PersonaFallbackTemplate, ...]:
+        configured = self.data["personalization"].get("fallback_copy", {})
+        return tuple(
+            PersonaFallbackTemplate(
+                template_id=str(item["id"]),
+                personas=tuple(str(persona) for persona in item["personas"]),
+                subject=str(item["subject"]),
+                pitch=str(item["pitch"]),
+            )
+            for item in configured.get("templates", [])
+        )
+
+    def fallback_templates_for_persona(
+        self,
+        persona: str,
+    ) -> tuple[CopyTemplate, ...]:
+        exact = tuple(
+            CopyTemplate(item.template_id, item.subject, item.pitch)
+            for item in self.fallback_templates
+            if persona in item.personas
+        )
+        if exact:
+            return exact
+        return tuple(
+            CopyTemplate(item.template_id, item.subject, item.pitch)
+            for item in self.fallback_templates
+            if "*" in item.personas
         )
 
     @property
@@ -533,6 +601,80 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
                     f"'{label}.confidence' must be a number from 0 to 1"
                 )
 
+    fallback_copy = personalization.get("fallback_copy")
+    fallback_copy_values: list[tuple[str, str]] = []
+    if fallback_copy is not None:
+        if not isinstance(fallback_copy, dict):
+            raise CampaignConfigError(
+                "'personalization.fallback_copy' must be a JSON object"
+            )
+        enabled = fallback_copy.get("enabled")
+        if not isinstance(enabled, bool):
+            raise CampaignConfigError(
+                "'personalization.fallback_copy.enabled' must be true or false"
+            )
+        if fallback_copy.get("status", "review") not in {"ready", "review"}:
+            raise CampaignConfigError(
+                "'personalization.fallback_copy.status' must be ready or review"
+            )
+        for key in (
+            "allow_unmatched_company",
+            "allow_single_csv_field",
+            "allow_explicit_company_exclusions",
+            "promote_company_review",
+        ):
+            if not isinstance(fallback_copy.get(key, False), bool):
+                raise CampaignConfigError(
+                    f"'personalization.fallback_copy.{key}' must be true or false"
+                )
+        templates = fallback_copy.get("templates", [])
+        if not isinstance(templates, list) or (enabled and not templates):
+            raise CampaignConfigError(
+                "'personalization.fallback_copy.templates' must be a non-empty "
+                "array when enabled"
+            )
+        fallback_ids: set[str] = set()
+        has_default_fallback = False
+        for index, template in enumerate(templates):
+            label = f"personalization.fallback_copy.templates[{index}]"
+            if not isinstance(template, dict):
+                raise CampaignConfigError(f"'{label}' must be an object")
+            template_id = _require_nonempty_string(
+                template,
+                "id",
+                label=f"{label}.id",
+            )
+            _validate_slug(template_id, f"{label}.id")
+            if template_id in fallback_ids:
+                raise CampaignConfigError(
+                    f"duplicate fallback template id: {template_id}"
+                )
+            fallback_ids.add(template_id)
+            personas = _require_string_list(
+                template,
+                "personas",
+                label=f"{label}.personas",
+            )
+            has_default_fallback = has_default_fallback or "*" in personas
+            subject = _require_nonempty_string(
+                template,
+                "subject",
+                label=f"{label}.subject",
+            )
+            pitch = _require_nonempty_string(
+                template,
+                "pitch",
+                label=f"{label}.pitch",
+            )
+            fallback_copy_values.extend(
+                ((f"{label}.subject", subject), (f"{label}.pitch", pitch))
+            )
+        if enabled and not has_default_fallback:
+            raise CampaignConfigError(
+                "personalization.fallback_copy.templates must include a '*' "
+                "persona fallback"
+            )
+
     qualification = _require_mapping(data, "qualification")
     company_qualification = _require_mapping(qualification, "company")
     fallback_min = company_qualification.get("fallback_min_agreeing_fields")
@@ -753,6 +895,7 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         *cta_copy,
         ("email.body", body),
         *copy_values,
+        *fallback_copy_values,
     ]
     for label, value in configured_copy:
         forbidden_character = forbidden_copy_character(value)

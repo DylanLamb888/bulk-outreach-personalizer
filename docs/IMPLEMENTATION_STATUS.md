@@ -53,10 +53,12 @@
 - Focus-gap manifest reporting with separate unmatched and intentional-exclusion samples
 - Cache pruning via `--prune-cache`
 - Per-row containment of title-hook gaps and fail-closed empty-subject and blank-company-name handling
+- Opt-in broad-campaign title-persona fallback for unmatched, unavailable, or explicitly permitted company evidence
+- Stable hashed company-name assignment for title fallback when a CSV has no usable website value
 
 ## Deliberate boundaries
 
-- Public websites plus company intelligence already supplied in the input CSV; no login, CAPTCHA bypass, LinkedIn scraping, or private data access
+- Public websites, approved company intelligence already supplied in the input CSV, and explicit title-persona fallback; no login, CAPTCHA bypass, LinkedIn scraping, or private data access
 - No per-row LLM calls or agent-written personalization
 - No email discovery or verification waterfall; the engine only evaluates supplied statuses and syntax
 - No automatic campaign sending or Smartlead mutation

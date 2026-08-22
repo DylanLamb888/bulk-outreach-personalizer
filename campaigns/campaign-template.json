@@ -114,6 +114,22 @@
         {"header": "Company industry", "confidence": 0.72}
       ]
     },
+    "fallback_copy": {
+      "enabled": false,
+      "status": "review",
+      "allow_unmatched_company": false,
+      "allow_single_csv_field": false,
+      "allow_explicit_company_exclusions": false,
+      "promote_company_review": false,
+      "templates": [
+        {
+          "id": "general-title-fallback",
+          "personas": ["*"],
+          "subject": "Relevant subject",
+          "pitch": "Replace with an approved title-based outreach question."
+        }
+      ]
+    },
     "angles": [
       {
         "id": "verified-signal",

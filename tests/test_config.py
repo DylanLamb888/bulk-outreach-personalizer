@@ -27,6 +27,15 @@ class CampaignConfigTests(unittest.TestCase):
             (ROOT / "campaigns" / "campaign-template-focus.csv").resolve(),
         )
 
+    def test_json_schema_declares_title_fallback_configuration(self) -> None:
+        schema = json.loads((ROOT / "config" / "campaign.schema.json").read_text())
+        personalization = schema["properties"]["personalization"]["properties"]
+        fallback = personalization["fallback_copy"]
+        self.assertEqual(fallback["type"], "object")
+        self.assertIn("allow_unmatched_company", fallback["properties"])
+        self.assertIn("allow_explicit_company_exclusions", fallback["properties"])
+        self.assertIn("templates", fallback["required"])
+
     def test_example_campaigns_are_valid(self) -> None:
         for path in sorted((ROOT / "campaigns" / "examples").glob("*.json")):
             with self.subTest(path=path.name):
@@ -88,6 +97,29 @@ class CampaignConfigTests(unittest.TestCase):
     def test_blocked_evidence_phrases_default_to_empty(self) -> None:
         config = load_campaign(ROOT / "campaigns" / "campaign-template.json")
         self.assertEqual(config.blocked_evidence_phrases, ())
+
+    def test_enabled_fallback_copy_requires_default_persona(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["personalization"]["fallback_copy"] = {
+            "enabled": True,
+            "status": "ready",
+            "allow_unmatched_company": True,
+            "allow_single_csv_field": True,
+            "promote_company_review": True,
+            "templates": [
+                {
+                    "id": "owner-only",
+                    "personas": ["owner"],
+                    "subject": "Outbound idea",
+                    "pitch": "Could another source of qualified conversations help?",
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(CampaignConfigError, "persona fallback"):
+                load_campaign(path)
 
     def test_missing_fallback_angle_is_rejected(self) -> None:
         payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
