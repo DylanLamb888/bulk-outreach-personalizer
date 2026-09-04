@@ -53,6 +53,7 @@
     ],
     "approved_claims": [
       "Scale Olympus handles the lists, outreach, and replies.",
+      "Scale Olympus can get a client 10-15 qualified prospects per month from a cold email campaign.",
       "The commercial model is a small tech fee plus a fee per qualified call delivered."
     ],
     "forbidden_claims": [
@@ -94,7 +95,7 @@
     "objective": "Use a verified product, service, audience, or specialism to frame a concrete outbound angle.",
     "output_field": "personalized_pitch",
     "focus_rules_file": "scale-olympus-focus.csv",
-    "max_words": 14,
+    "max_words": 24,
     "min_confidence": 0.72,
     "low_confidence_action": "review",
     "banned_phrases": [
@@ -128,7 +129,7 @@
       "enabled": false,
       "provider": "claude-code",
       "domains_per_call": 5,
-      "write_pitch": true,
+      "write_pitch": false,
       "max_pitch_words": 30,
       "max_nominal_usd": 20,
       "allow_expensive_models": false,
@@ -164,44 +165,29 @@
         "signal_types": ["product", "service", "audience", "specialism", "positioning", "*"],
         "templates": [
           {
-            "id": "buyer-speak",
-            "subject": "Buyer conversations",
-            "pitch": "Would more conversations with {{buyer_phrase}} be useful?"
+            "id": "we-can-get-you",
+            "subject": "{{company_short_name}}",
+            "pitch": "We can get you 10-15 {{buyer_phrase}} that need your {{company_focus}} per month with a cold email campaign."
           },
           {
-            "id": "focused-reach",
-            "subject": "25 target companies",
-            "pitch": "Are you looking to speak with more {{buyer_phrase}}?"
+            "id": "want-more",
+            "subject": "10-15 a month",
+            "pitch": "Want 10-15 {{buyer_phrase}} that need your {{company_focus}} landing in your calendar each month?"
           },
           {
-            "id": "useful-reach",
-            "subject": "Outbound idea",
-            "pitch": "Would speaking with more {{buyer_phrase}} help?"
+            "id": "put-in-front",
+            "subject": "Cold email idea",
+            "pitch": "We could put 10-15 {{buyer_phrase}} that need your {{company_focus}} in front of you every month."
           },
           {
-            "id": "conversation-question",
-            "subject": "New conversations",
-            "pitch": "Is reaching more {{buyer_phrase}} useful right now?"
+            "id": "booked-for-you",
+            "subject": "Booked calls",
+            "pitch": "10-15 {{buyer_phrase}} that need your {{company_focus}}, booked for you every month through cold email."
           },
           {
-            "id": "direct-help",
-            "subject": "Target account list",
-            "pitch": "Are more conversations with {{buyer_phrase}} a priority?"
-          },
-          {
-            "id": "campaign-audience",
-            "subject": "A quick idea",
-            "pitch": "Would it help to reach more {{buyer_phrase}}?"
-          },
-          {
-            "id": "priority-question",
-            "subject": "More buyer conversations",
-            "pitch": "Do you want more conversations with {{buyer_phrase}}?"
-          },
-          {
-            "id": "simple-reach",
-            "subject": "A list idea",
-            "pitch": "Is it worth reaching more {{buyer_phrase}}?"
+            "id": "how-about",
+            "subject": "Quick idea",
+            "pitch": "How about 10-15 {{buyer_phrase}} that need your {{company_focus}} each month from cold email?"
           }
         ]
       }
