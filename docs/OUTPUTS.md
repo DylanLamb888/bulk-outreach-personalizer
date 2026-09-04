@@ -113,3 +113,5 @@ Cache hits require identical rendered model prompts and validation inputs. The m
 Generated CSVs belong under `outputs/`; cache data belongs under `var/`. Both are excluded from Git because they can contain prospect or client information.
 
 A persistent subscription rate limit stops the run before new output CSVs or a manifest are published. Existing outputs may be from an older run. Retry delays are bounded to 5, 15, and 30 seconds; completed decisions remain cached. Retry tokens and nominal costs are counted where reported by the CLI.
+
+Codex live execution is untested as of 2026-09-04 because the installed CLI cannot start. Its current parser returns zero token fields, which means unavailable telemetry, not a measured free run. Do not use those zeros to validate a Codex budget. The failed local startup check made no model calls.

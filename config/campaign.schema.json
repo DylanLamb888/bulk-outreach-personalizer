@@ -595,7 +595,7 @@
                 "codex",
                 "api"
               ],
-              "description": "claude-code uses the local Claude Code login (default); codex uses the Codex CLI login; both retry subscription throttling three times then stop. api uses the Anthropic SDK."
+              "description": "claude-code uses the local Claude Code login (default); codex uses the Codex CLI login (live execution not yet verified); both retry subscription throttling three times then stop. api uses the Anthropic SDK."
             },
             "domains_per_call": {
               "type": "integer",

@@ -57,6 +57,8 @@ Ask, in this order:
 
 - Default `llm_focus.provider` is `claude-code`; use `codex` only if the
   operator says the run should use their ChatGPT subscription.
+- Codex is untested live on this machine (2026-09-04: missing native
+  executable). A PATH check alone does not verify login or execution.
 - Default `llm_focus.model` is `claude-opus-5` at `effort` `low`. Offer
   `claude-sonnet-5` when the list is large and usage matters. Never set a
   Fable or Mythos model unless the operator explicitly asks and accepts that

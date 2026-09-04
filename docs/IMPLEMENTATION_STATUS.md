@@ -85,3 +85,5 @@
 - Balanced CTA and offer-line assignment is deterministic per identical batch; changing the batch's rendered-domain set re-balances assignments across it
 
 The engine can later accept optional API-backed fetch adapters without changing the campaign or CSV output contract.
+
+Codex live status (2026-09-04): untested. The installed `/opt/homebrew/bin/codex` npm wrapper fails with `ENOENT` because its native executable is missing. Version, help, and login-status checks never reached the CLI; no five-domain test ran and no model usage occurred. Fake-runner tests cover transport behavior, not live authentication or model compatibility. Keep the default Claude Code provider for now.
