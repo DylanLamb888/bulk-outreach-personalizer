@@ -614,7 +614,7 @@
             "max_nominal_usd": {
               "type": "number",
               "exclusiveMinimum": 0,
-              "description": "Stop submitting new model calls once the run's nominal usage reaches this amount."
+              "description": "Stop new waves once nominal usage reaches this amount; in-flight calls may overshoot. Completed decisions are checkpointed for a subsequent run."
             },
             "allow_expensive_models": {
               "type": "boolean",

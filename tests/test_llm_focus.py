@@ -83,7 +83,7 @@ class RecordingTransport:
         self.error = error
         self.sent: list[list[str]] = []
 
-    def send(self, requests):
+    def send(self, requests, *, on_complete=None):
         self.sent.append([request.custom_id for request in requests])
         results = {}
         for request in requests:
@@ -94,6 +94,8 @@ class RecordingTransport:
             results[request.custom_id] = TransportResult(
                 text=json.dumps(raw), input_tokens=100, output_tokens=30
             )
+        if on_complete is not None:
+            on_complete(results)
         return results
 
 
@@ -418,6 +420,81 @@ def _claude_envelope(results: list[dict], *, is_error: bool = False, result: str
 
 
 class ClaudeCodeTransportTests(unittest.TestCase):
+    def test_completed_chunks_survive_fatal_error_and_resume_without_rebilling(self) -> None:
+        for concurrency in (1, 2):
+            with self.subTest(concurrency=concurrency), tempfile.TemporaryDirectory() as tmp:
+                cache = JsonCache(Path(tmp) / "cache")
+                items = [
+                    LlmFocusItem(f"site{i}.example", "Acme", SITE_TEXT, f"https://site{i}.example/")
+                    for i in range(2)
+                ]
+                calls = []
+                fail = True
+
+                def run(argv, **kwargs):
+                    domain = next(line[8:] for line in argv[-1].splitlines() if line.startswith("Domain: "))
+                    calls.append(domain)
+                    if domain == "site1.example" and fail:
+                        if concurrency == 1:
+                            self.assertIsNotNone(cache.get("llm-focus", classifier.cache_key(items[0]), ttl_hours=720))
+                        raise FileNotFoundError("simulated fatal CLI failure")
+                    envelope = json.loads(_claude_envelope([{"domain": domain, **GOOD_RAW}]))
+                    envelope["total_cost_usd"] = 0.6
+                    return SimpleNamespace(returncode=0, stdout=json.dumps(envelope), stderr="")
+
+                def fresh():
+                    return LlmFocusClassifier(
+                        LlmFocusSettings(enabled=True, icp="x"), cache=cache,
+                        transport=ClaudeCodeTransport(
+                            model="claude-opus-5", binary="/fake/claude", run=run,
+                            domains_per_call=1, concurrency=concurrency, max_nominal_usd=1.0,
+                        ),
+                        offer_service="s", offer_audience="a", limits=LIMITS,
+                    )
+
+                classifier = fresh()
+                with self.assertRaises(LlmFocusError):
+                    classifier.classify(items)
+                self.assertAlmostEqual(classifier.stats()["nominal_cost_usd"], 0.6)
+                self.assertIsNotNone(cache.get("llm-focus", classifier.cache_key(items[0]), ttl_hours=720))
+                fail = False
+                calls.clear()
+                resumed = fresh()
+                decisions = resumed.classify(items)
+                self.assertEqual(calls, ["site1.example"])
+                self.assertTrue(decisions["site0.example"].from_cache)
+                self.assertFalse(decisions["site1.example"].from_cache)
+                self.assertAlmostEqual(resumed.stats()["nominal_cost_usd"], 0.6)
+                calls.clear()
+                repeated = fresh()
+                repeated.classify(items)
+                self.assertEqual(calls, [])
+                self.assertEqual(repeated.stats()["nominal_cost_usd"], 0)
+
+    def test_parallel_checkpoints_keep_cumulative_budget_and_stop_next_wave(self) -> None:
+        calls = []
+        checkpoints = []
+
+        def run(argv, **kwargs):
+            domain = next(line[8:] for line in argv[-1].splitlines() if line.startswith("Domain: "))
+            calls.append(domain)
+            envelope = json.loads(_claude_envelope([{"domain": domain, **GOOD_RAW}]))
+            envelope["total_cost_usd"] = 0.6
+            return SimpleNamespace(returncode=0, stdout=json.dumps(envelope), stderr="")
+
+        transport = ClaudeCodeTransport(
+            model="claude-opus-5", binary="/fake/claude", run=run,
+            domains_per_call=1, concurrency=2, max_nominal_usd=1.0,
+        )
+        results = transport.send(
+            [_request(str(i), f"site{i}.example") for i in range(4)],
+            on_complete=lambda chunk: checkpoints.extend(chunk),
+        )
+        self.assertEqual(len(calls), 2)
+        self.assertCountEqual(checkpoints, ["0", "1"])
+        self.assertAlmostEqual(transport.budget.spent_usd, 1.2)
+        self.assertIn("budget", results["2"].error)
+
     def _fake_run(self, calls: list[list[str]], stdout_for):
         def run(argv, **kwargs):
             calls.append(argv)

@@ -32,6 +32,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
@@ -271,8 +272,13 @@ class PhraseLimits:
     max_source_phrase_words: int = 5
 
 
+ResultCallback = Callable[[dict[str, TransportResult]], None]
+
+
 class Transport(Protocol):
-    def send(self, requests: list[LlmRequest]) -> dict[str, TransportResult]: ...
+    def send(
+        self, requests: list[LlmRequest], *, on_complete: ResultCallback | None = None
+    ) -> dict[str, TransportResult]: ...
 
 
 # ---------------------------------------------------------------------------
@@ -715,11 +721,13 @@ class _Budget:
         self.limit_usd = max(0.0, float(limit_usd))
         self.spent_usd = 0.0
         self.exhausted = False
+        self._lock = threading.Lock()
 
     def add(self, amount: float) -> None:
-        self.spent_usd = round(self.spent_usd + max(0.0, amount), 6)
-        if self.limit_usd and self.spent_usd >= self.limit_usd:
-            self.exhausted = True
+        with self._lock:
+            self.spent_usd = round(self.spent_usd + max(0.0, amount), 6)
+            if self.limit_usd and self.spent_usd >= self.limit_usd:
+                self.exhausted = True
 
     def refusal(self) -> TransportResult:
         return TransportResult(
@@ -757,7 +765,9 @@ class SyncAnthropicTransport:
             return TransportResult(error=f"{type(exc).__name__}: {exc}")
         return _message_to_result(message)
 
-    def send(self, requests: list[LlmRequest]) -> dict[str, TransportResult]:
+    def send(
+        self, requests: list[LlmRequest], *, on_complete: ResultCallback | None = None
+    ) -> dict[str, TransportResult]:
         results: dict[str, TransportResult] = {}
         if not requests:
             return results
@@ -775,6 +785,8 @@ class SyncAnthropicTransport:
                     result = future.result()
                     results[futures[future]] = result
                     self.budget.add(result.nominal_cost_usd)
+                    if on_complete is not None:
+                        on_complete({futures[future]: result})
         return results
 
 
@@ -813,7 +825,10 @@ class BatchAnthropicTransport:
             self.log(f"batch {batch_id}: {processing} requests still processing")
             self.sleep(self.poll_seconds)
 
-    def _collect(self, batch_id: str, results: dict[str, TransportResult]) -> None:
+    def _collect(
+        self, batch_id: str, results: dict[str, TransportResult],
+        on_complete: ResultCallback | None = None,
+    ) -> None:
         for entry in self.client.messages.batches.results(batch_id):
             custom_id = str(getattr(entry, "custom_id", ""))
             outcome = getattr(entry, "result", None)
@@ -827,14 +842,18 @@ class BatchAnthropicTransport:
                 )
             else:
                 results[custom_id] = TransportResult(error=f"batch request {kind or 'failed'}")
+            if on_complete is not None:
+                on_complete({custom_id: results[custom_id]})
 
-    def send(self, requests: list[LlmRequest]) -> dict[str, TransportResult]:
+    def send(
+        self, requests: list[LlmRequest], *, on_complete: ResultCallback | None = None
+    ) -> dict[str, TransportResult]:
         results: dict[str, TransportResult] = {}
         wanted = {request.custom_id for request in requests}
         for batch_id in self.existing_batch_ids:
             self.log(f"reusing batch {batch_id}")
             self._wait(batch_id)
-            self._collect(batch_id, results)
+            self._collect(batch_id, results, on_complete)
         pending = [request for request in requests if request.custom_id not in results]
         for start in range(0, len(pending), MAX_BATCH_REQUESTS):
             chunk = pending[start : start + MAX_BATCH_REQUESTS]
@@ -859,7 +878,7 @@ class BatchAnthropicTransport:
                 f"polling every {self.poll_seconds:g}s (pass --llm-batch-id {batch_id} to resume)"
             )
             self._wait(batch_id)
-            self._collect(batch_id, results)
+            self._collect(batch_id, results, on_complete)
         return {custom_id: result for custom_id, result in results.items() if custom_id in wanted}
 
 
@@ -986,7 +1005,9 @@ class _CliTransport:
             results[request.custom_id] = TransportResult(text=json.dumps(payload), **shares)
         return results
 
-    def send(self, requests: list[LlmRequest]) -> dict[str, TransportResult]:
+    def send(
+        self, requests: list[LlmRequest], *, on_complete: ResultCallback | None = None
+    ) -> dict[str, TransportResult]:
         results: dict[str, TransportResult] = {}
         if not requests:
             return results
@@ -1004,10 +1025,23 @@ class _CliTransport:
                 for chunk in wave:
                     results.update({request.custom_id: self.budget.refusal() for request in chunk})
                 continue
+            # Initialize before workers start so all calls share one empty directory.
+            _ = self.workdir
+            fatal: Exception | None = None
             with ThreadPoolExecutor(max_workers=len(wave)) as pool:
                 futures = [pool.submit(self._send_chunk, chunk) for chunk in wave]
                 for future in as_completed(futures):
-                    results.update(future.result())
+                    try:
+                        completed = future.result()
+                    except Exception as exc:
+                        fatal = fatal or exc
+                        continue
+                    results.update(completed)
+                    if on_complete is not None:
+                        on_complete(completed)
+            # Drain and checkpoint successful peers even if a sibling failed.
+            if fatal is not None:
+                raise fatal
         if self.budget.exhausted:
             self.log(
                 f"{self.provider}: stopped at nominal ${self.budget.spent_usd:.2f} of the "
@@ -1327,30 +1361,41 @@ class LlmFocusClassifier:
                 for custom_id, (item, _key) in pending.items()
             ]
             self._stats["sent"] += len(requests)
-            responses = self.transport.send(requests)
-            for custom_id, (item, key) in pending.items():
-                result = responses.get(
+            processed: set[str] = set()
+
+            def checkpoint(responses: dict[str, TransportResult]) -> None:
+                for custom_id, result in responses.items():
+                    if custom_id in processed or custom_id not in pending:
+                        continue
+                    item, key = pending[custom_id]
+                    decision = self._decision_from_result(item, result)
+                    decisions[item.domain] = decision
+                    self._stats["input_tokens"] += result.input_tokens
+                    self._stats["output_tokens"] += result.output_tokens
+                    self._stats["cache_read_input_tokens"] += result.cache_read_input_tokens
+                    self._nominal_cost_usd += result.nominal_cost_usd
+                    if decision.status == "ok":
+                        self._stats["ok"] += 1
+                        if decision.pitch:
+                            self._stats["pitches_written"] += 1
+                        elif decision.pitch_error:
+                            self._stats["pitches_rejected"] += 1
+                    elif decision.status == "rejected":
+                        self._stats["rejected"] += 1
+                    else:
+                        self._stats["errors"] += 1
+                    # Transport failures are retried on the next run; model verdicts are kept.
+                    if decision.status != "error":
+                        self.cache.put(CACHE_NAMESPACE, key, decision.to_dict())
+                    processed.add(custom_id)
+
+            responses = self.transport.send(requests, on_complete=checkpoint)
+            checkpoint({
+                custom_id: responses.get(
                     custom_id, TransportResult(error="no response was returned for this request")
                 )
-                decision = self._decision_from_result(item, result)
-                decisions[item.domain] = decision
-                self._stats["input_tokens"] += result.input_tokens
-                self._stats["output_tokens"] += result.output_tokens
-                self._stats["cache_read_input_tokens"] += result.cache_read_input_tokens
-                self._nominal_cost_usd += result.nominal_cost_usd
-                if decision.status == "ok":
-                    self._stats["ok"] += 1
-                    if decision.pitch:
-                        self._stats["pitches_written"] += 1
-                    elif decision.pitch_error:
-                        self._stats["pitches_rejected"] += 1
-                elif decision.status == "rejected":
-                    self._stats["rejected"] += 1
-                else:
-                    self._stats["errors"] += 1
-                # Transport failures are retried on the next run; model verdicts are kept.
-                if decision.status != "error":
-                    self.cache.put(CACHE_NAMESPACE, key, decision.to_dict())
+                for custom_id in pending if custom_id not in processed
+            })
         return decisions
 
     def _decision_from_result(self, item: LlmFocusItem, result: TransportResult) -> LlmFocusDecision:

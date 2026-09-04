@@ -620,7 +620,7 @@ Decisions are cached under `var/cache/llm-focus` by domain, provider, the comple
 
 `--validate-only` reports `provider_ready` and a plain-English blocker when the CLI is missing, plus `estimated_nominal_usd_for_list` so you know what a run will consume before it starts. The run itself stops before fetching anything if the CLI is absent or not signed in. Campaign files never carry keys or tokens.
 
-Two guards protect your subscription. Fable and Mythos tier models are refused unless the campaign sets `allow_expensive_models` to true. Each run stops submitting new calls once its nominal usage reaches `max_nominal_usd` (default 20); the remaining companies are left uncached and the next run picks them up. The manifest records `nominal_cost_usd` for every run.
+Two guards protect your subscription. Fable and Mythos tier models are refused unless the campaign sets `allow_expensive_models` to true. Each run stops submitting new calls once its nominal usage reaches `max_nominal_usd` (default 20); the remaining companies are left uncached and the next run picks them up. The manifest records `nominal_cost_usd` for every completed run. Each completed model chunk is validated and atomically cached before the next wave starts. After an interruption, rerunning unchanged inputs skips those decisions; calls still in flight when the process dies may need repeating. Concurrent calls already in flight can carry nominal usage over the limit.
 
 ```bash
 python scripts/enrich.py \
