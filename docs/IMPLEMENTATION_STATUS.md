@@ -55,6 +55,7 @@
 - Cache pruning via `--prune-cache`
 - Model quote length, configured evidence blocks, navigation/cookie filters; phrase presence alone is not a relevance guarantee
 - Exact approved-sentence checks for model numeric/promissory copy, safe template fallback, and selective review for offer mechanics
+- Bounded subscription-throttle retries for Claude Code and Codex (5, 15, 30 seconds), then fatal stop rather than regex fallback
 - Incremental validated model checkpoints, successful-peer recovery on fatal CLI errors, and thread-safe cumulative wave budgets
 - Model cache identity includes complete rendered system/company prompts and validation inputs; legacy partial-brief entries miss safely
 - Per-row containment of title-hook gaps and fail-closed empty-subject and blank-company-name handling

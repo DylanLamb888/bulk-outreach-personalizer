@@ -68,6 +68,10 @@ Ask, in this order:
   are saved before the next wave, so an interruption preserves completed work. Changed prompts, claims,
   contact context, evidence, or validation limits require fresh model calls.
 
+Subscription limits trigger three bounded retries (5, 15, 30 seconds), then a
+clear stop. Resume after the subscription resets; do not treat it as a completed
+run or quietly fall back to regex for the unprocessed list.
+
 ## 5. The email
 
 - Keep the body template from the example: greeting, personalised pitch,

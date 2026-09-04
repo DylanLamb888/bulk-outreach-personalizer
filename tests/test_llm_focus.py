@@ -644,6 +644,70 @@ class CodexTransportTests(unittest.TestCase):
             transport.send([_request("id0", "site0.example")])
 
 
+class SubscriptionRetryTests(unittest.TestCase):
+    def test_throttle_recovery_is_bounded_and_accounts_for_retry_usage(self) -> None:
+        for transport_type in (ClaudeCodeTransport, CodexTransport):
+            for message in ("429 Too many requests", "You've hit your limit", "usage_limit_reached"):
+                with self.subTest(provider=transport_type.provider, message=message):
+                    calls, sleeps = [], []
+
+                    def run(argv, **kwargs):
+                        calls.append(argv)
+                        if len(calls) == 1:
+                            envelope = json.loads(_claude_envelope([], is_error=True, result=message))
+                            envelope["total_cost_usd"] = 0.1
+                            return SimpleNamespace(returncode=1, stdout=json.dumps(envelope) if transport_type is ClaudeCodeTransport else "", stderr=message)
+                        entries = [{"domain": "site0.example", **GOOD_RAW}]
+                        if transport_type is CodexTransport:
+                            Path(argv[argv.index("--output-last-message") + 1]).write_text(json.dumps({"results": entries}))
+                            return SimpleNamespace(returncode=0, stdout="", stderr="")
+                        envelope = json.loads(_claude_envelope(entries))
+                        envelope["total_cost_usd"] = 0.2
+                        return SimpleNamespace(returncode=0, stdout=json.dumps(envelope), stderr="")
+
+                    transport = transport_type(model="claude-opus-5", binary="/fake/cli", run=run, sleep=sleeps.append)
+                    result = transport.send([_request("0", "site0.example")])["0"]
+                    self.assertEqual(result.error, "")
+                    self.assertEqual(sleeps, [5.0])
+                    self.assertEqual(transport.calls, 2)
+                    self.assertEqual(transport.retries, 1)
+                    if transport_type is ClaudeCodeTransport:
+                        self.assertAlmostEqual(result.nominal_cost_usd, 0.3)
+                        self.assertAlmostEqual(transport.budget.spent_usd, 0.3)
+                        self.assertEqual(result.input_tokens, 6004)
+
+    def test_persistent_throttle_stops_before_later_domains_and_keeps_checkpoint(self) -> None:
+        for transport_type in (ClaudeCodeTransport, CodexTransport):
+            with self.subTest(provider=transport_type.provider), tempfile.TemporaryDirectory() as tmp:
+                calls, sleeps = [], []
+
+                def run(argv, **kwargs):
+                    domain = next(line[8:] for line in argv[-1].splitlines() if line.startswith("Domain: "))
+                    calls.append(domain)
+                    if domain != "site0.example":
+                        return SimpleNamespace(returncode=1, stdout="", stderr="subscription usage limit reached")
+                    entries = [{"domain": domain, **GOOD_RAW}]
+                    if transport_type is CodexTransport:
+                        Path(argv[argv.index("--output-last-message") + 1]).write_text(json.dumps({"results": entries}))
+                        return SimpleNamespace(returncode=0, stdout="", stderr="")
+                    return SimpleNamespace(returncode=0, stdout=_claude_envelope(entries), stderr="")
+
+                cache = JsonCache(Path(tmp) / "cache")
+                classifier = LlmFocusClassifier(
+                    LlmFocusSettings(enabled=True, icp="x", provider=transport_type.provider),
+                    cache=cache,
+                    transport=transport_type(model="claude-opus-5", binary="/fake/cli", run=run, sleep=sleeps.append, concurrency=1, domains_per_call=1),
+                    offer_service="s", offer_audience="a", limits=LIMITS,
+                )
+                items = [LlmFocusItem(f"site{i}.example", "Acme", SITE_TEXT, f"https://site{i}.example/") for i in range(3)]
+                with self.assertRaisesRegex(LlmFocusError, "subscription throttling persists"):
+                    classifier.classify(items)
+                self.assertEqual(calls, ["site0.example"] + ["site1.example"] * 4)
+                self.assertEqual(sleeps, [5.0, 15.0, 30.0])
+                self.assertIsNotNone(cache.get("llm-focus", classifier.cache_key(items[0]), ttl_hours=720))
+                self.assertIsNone(cache.get("llm-focus", classifier.cache_key(items[1]), ttl_hours=720))
+
+
 class ProviderTests(unittest.TestCase):
     def test_build_transport_matches_provider(self) -> None:
         self.assertIsInstance(build_transport(LlmFocusSettings(enabled=True, icp="x", provider="claude-code")), ClaudeCodeTransport)

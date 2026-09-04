@@ -773,3 +773,5 @@ Self-hosted Firecrawl should sit behind a secure proxy that blocks private and l
 - [Campaign template](campaigns/campaign-template.json)
 - [Focus-rule template](campaigns/campaign-template-focus.csv)
 - [Skill instructions](skill/bulk-outreach-personalizer/SKILL.md)
+
+Subscription throttling is retried at most three times, after 5, 15, and 30 seconds. Persistent throttling stops the run with a clear error; it never silently downgrades the remaining list to regex copy. Completed decisions remain cached. Wait for the subscription reset before resuming. The manifest reports `retry_count`; metered retry usage is included when the CLI reports it.

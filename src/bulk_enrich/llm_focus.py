@@ -955,6 +955,23 @@ class BatchAnthropicTransport:
 # ---------------------------------------------------------------------------
 Runner = Callable[..., "subprocess.CompletedProcess[str]"]
 
+_THROTTLE_RE = re.compile(
+    r"\b429\b|rate[_ -]?limit|too many requests|usage[_ -]?limit|"
+    r"(?:hit|reached|exceeded) (?:your |the )?(?:usage |subscription )?limit|"
+    r"quota (?:exceeded|exhausted)|exceeded (?:your )?(?:current )?quota", re.I,
+)
+
+
+class SubscriptionRateLimitError(LlmFocusError):
+    def __init__(self, usage: dict[str, int | float] | None = None) -> None:
+        super().__init__("subscription rate limit reached")
+        self.usage = usage or {}
+
+
+def _check_throttling(detail: str, usage: dict[str, int | float] | None = None) -> None:
+    if _THROTTLE_RE.search(detail):
+        raise SubscriptionRateLimitError(usage)
+
 
 def _strip_fences(text: str) -> str:
     stripped = text.strip()
@@ -989,7 +1006,10 @@ class _CliTransport:
         timeout: float = CLI_TIMEOUT_SECONDS,
         log: Callable[[str], None] | None = None,
         max_nominal_usd: float = 0.0,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        self.sleep = sleep
+        self.retries = 0
         self.model = model
         self.effort = effort
         self.budget = _Budget(max_nominal_usd)
@@ -1018,6 +1038,46 @@ class _CliTransport:
         raise NotImplementedError
 
     def _send_chunk(self, chunk: list[LlmRequest]) -> dict[str, TransportResult]:
+        delays = (5.0, 15.0, 30.0)
+        retry_usage: dict[str, int | float] = {
+            "input_tokens": 0, "output_tokens": 0,
+            "cache_read_input_tokens": 0, "nominal_cost_usd": 0.0,
+        }
+        for attempt in range(len(delays) + 1):
+            try:
+                results = self._send_chunk_once(chunk)
+            except SubscriptionRateLimitError as exc:
+                cost = float(exc.usage.get("nominal_cost_usd", 0.0)) or nominal_cost_usd(
+                    self.model, int(exc.usage.get("input_tokens", 0)), int(exc.usage.get("output_tokens", 0))
+                )
+                self.budget.add(cost)
+                for key in retry_usage:
+                    retry_usage[key] += cost if key == "nominal_cost_usd" else exc.usage.get(key, 0)
+                if attempt == len(delays) or self.budget.exhausted:
+                    raise LlmFocusError(
+                        f"{self.provider}: subscription throttling persists or the nominal budget was reached; "
+                        f"stopped after {attempt + 1} attempts for this chunk. "
+                        "Wait for your subscription limit to reset, then rerun unchanged inputs; "
+                        "completed companies are cached. No regex fallback was produced for this failure."
+                    ) from exc
+                self.log(f"{self.provider}: subscription rate limit; retry {attempt + 1}/3 in {delays[attempt]:g}s")
+                self.retries += 1
+                self.sleep(delays[attempt])
+                continue
+            # Include metered failed attempts in the final per-domain usage once.
+            for index, request in enumerate(chunk):
+                result = results[request.custom_id]
+                usage = {
+                    key: getattr(result, key) + (
+                        round(float(value) / len(chunk), 6) if key == "nominal_cost_usd"
+                        else _distribute_usage(int(value), len(chunk), index)
+                    ) for key, value in retry_usage.items()
+                }
+                results[request.custom_id] = TransportResult(**{**asdict(result), **usage})
+            return results
+        raise AssertionError("unreachable retry state")
+
+    def _send_chunk_once(self, chunk: list[LlmRequest]) -> dict[str, TransportResult]:
         output_path = self.workdir / f"{chunk[0].custom_id}.last.txt"
         argv = self.argv(chunk, output_path)
         try:
@@ -1162,18 +1222,11 @@ class ClaudeCodeTransport(_CliTransport):
             envelope = {}
         if not isinstance(envelope, dict) or not envelope:
             detail = (completed.stderr or stdout or "").strip()[-400:]
+            _check_throttling(detail)
             raise ValueError(
                 f"claude exited with code {completed.returncode} without a JSON result"
                 + (f": {detail}" if detail else "")
             )
-        result_text = str(envelope.get("result") or "")
-        if envelope.get("is_error"):
-            if "not logged in" in result_text.casefold():
-                raise LlmFocusError(
-                    "Claude Code is not logged in; run `claude` once and sign in with your "
-                    "subscription before using the claude-code provider"
-                )
-            raise ValueError(f"claude reported an error: {result_text[:300]}")
         usage_block = envelope.get("usage") or {}
         usage = {
             "input_tokens": int(usage_block.get("input_tokens") or 0)
@@ -1182,14 +1235,25 @@ class ClaudeCodeTransport(_CliTransport):
             "cache_read_input_tokens": int(usage_block.get("cache_read_input_tokens") or 0),
             "nominal_cost_usd": float(envelope.get("total_cost_usd") or 0.0),
         }
+        result_text = str(envelope.get("result") or "")
+        if envelope.get("is_error") or completed.returncode != 0:
+            _check_throttling(json.dumps(envelope) + (completed.stderr or ""), usage)
+            if "not logged in" in result_text.casefold():
+                raise LlmFocusError(
+                    "Claude Code is not logged in; run `claude` once and sign in with your "
+                    "subscription before using the claude-code provider"
+                )
+            raise ValueError(f"claude reported an error: {result_text[:300]}")
         structured = envelope.get("structured_output")
         if not isinstance(structured, dict):
             try:
                 structured = json.loads(_strip_fences(result_text))
             except json.JSONDecodeError as exc:
+                _check_throttling(result_text, usage)
                 raise ValueError(f"claude returned no structured output: {exc}") from exc
         entries = structured.get("results") if isinstance(structured, dict) else None
         if not isinstance(entries, list):
+            _check_throttling(json.dumps(structured), usage)
             raise ValueError("claude structured output has no results array")
         return entries, usage
 
@@ -1230,6 +1294,8 @@ class CodexTransport(_CliTransport):
         finally:
             with contextlib.suppress(OSError):
                 output_path.unlink()
+        if completed.returncode != 0:
+            _check_throttling((completed.stderr or "") + (completed.stdout or "") + last_message)
         if completed.returncode != 0 and not last_message.strip():
             detail = (completed.stderr or completed.stdout or "").strip()[-400:]
             if "login" in detail.casefold():
@@ -1241,9 +1307,11 @@ class CodexTransport(_CliTransport):
         try:
             structured = json.loads(_strip_fences(last_message))
         except json.JSONDecodeError as exc:
+            _check_throttling(last_message + (completed.stderr or "") + (completed.stdout or ""))
             raise ValueError(f"codex returned no JSON object: {exc}") from exc
         entries = structured.get("results") if isinstance(structured, dict) else None
         if not isinstance(entries, list):
+            _check_throttling(json.dumps(structured))
             raise ValueError("codex output has no results array")
         return entries, {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0}
 
@@ -1505,6 +1573,7 @@ class LlmFocusClassifier:
                 self.settings.domains_per_call if self.settings.provider != "api" else 1
             ),
             "cli_calls": int(getattr(self.transport, "calls", 0)),
+            "retry_count": int(getattr(self.transport, "retries", 0)),
             "write_pitch": self.settings.write_pitch,
             "nominal_cost_usd": round(self._nominal_cost_usd, 4),
             "budget_usd": self.settings.max_nominal_usd,

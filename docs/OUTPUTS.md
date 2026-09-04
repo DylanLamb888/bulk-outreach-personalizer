@@ -102,7 +102,7 @@ Every output receives a JSON manifest containing:
 - copy-quality evaluation, warning counts, and flagged-row counts;
 - opening, exact-pitch, buyer-phrase, offer-line, and CTA concentration warnings, each reporting `count` (all affected domains) and `flagged` (the deterministic over-cap overflow demoted to review);
 - a `focus_gaps` object with separate unmatched and intentionally excluded domain counts, plus up to 25 evidence samples for each group;
-- an `llm_focus` object: `enabled`, and when enabled the provider, model, effort, domains per call, CLI call count, prompt version, brief digest, batch IDs, requested/sent/cache-hit counts, ok/rejected/error counts, pitches written and rejected, input, output, and cache-read token totals, `nominal_cost_usd`, `budget_usd`, and `budget_exhausted`;
+- an `llm_focus` object: `enabled`, and when enabled the provider, model, effort, domains per call, CLI call count, `retry_count`, prompt version, brief digest, batch IDs, requested/sent/cache-hit counts, ok/rejected/error counts, pitches written and rejected, input, output, and cache-read token totals, `nominal_cost_usd`, `budget_usd`, and `budget_exhausted`;
 - the exact non-secret run settings.
 - immutable copies and hashes of the campaign JSON and focus CSV used for the run.
 
@@ -111,3 +111,5 @@ Completed model chunks are checkpointed before the next wave. A fatal interrupti
 Cache hits require identical rendered model prompts and validation inputs. The manifest brief digest is a summary, not the complete cache identity; prompt or claim edits can trigger fresh calls. Legacy partial-brief model entries are not reused.
 
 Generated CSVs belong under `outputs/`; cache data belongs under `var/`. Both are excluded from Git because they can contain prospect or client information.
+
+A persistent subscription rate limit stops the run before new output CSVs or a manifest are published. Existing outputs may be from an older run. Retry delays are bounded to 5, 15, and 30 seconds; completed decisions remain cached. Retry tokens and nominal costs are counted where reported by the CLI.
