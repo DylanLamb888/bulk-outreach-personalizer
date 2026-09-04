@@ -1263,18 +1263,30 @@ class LlmFocusClassifier:
         self._nominal_cost_usd = 0.0
 
     def cache_key(self, item: LlmFocusItem) -> str:
-        evidence_digest = hashlib.sha256(item.evidence_text.encode("utf-8")).hexdigest()[:16]
+        # Cache the actual request and validation inputs, not a subset of the
+        # campaign brief: an old pitch must never survive changed offer terms,
+        # contact context, or copy constraints. Legacy keys intentionally miss.
+        payload = json.dumps(
+            {
+                "request": build_request_params(
+                    item, self.settings, system_prompt=self.system_prompt
+                ),
+                "validation": {
+                    "company_name": item.company_name,
+                    "evidence_text": item.evidence_text,
+                    "limits": asdict(self.limits),
+                },
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
         return "|".join(
             (
                 PROMPT_VERSION,
                 self.settings.provider,
-                self.settings.model,
-                self.settings.effort,
-                self.settings.brief_digest(),
-                f"{self.limits.max_focus_words}",
-                f"{self.limits.max_buyer_phrase_words}",
                 item.domain,
-                evidence_digest,
+                hashlib.sha256(payload.encode("utf-8")).hexdigest(),
             )
         )
 

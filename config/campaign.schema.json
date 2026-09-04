@@ -517,7 +517,7 @@
         },
         "llm_focus": {
           "type": "object",
-          "description": "Opt-in Claude classification of each unique company domain. Never per row; cached by domain, model, and brief.",
+          "description": "Opt-in model classification of each unique company domain. Never per row; cached by domain, provider, complete rendered prompts, and validation inputs.",
           "additionalProperties": false,
           "required": [
             "enabled"

@@ -102,4 +102,6 @@ Every output receives a JSON manifest containing:
 - the exact non-secret run settings.
 - immutable copies and hashes of the campaign JSON and focus CSV used for the run.
 
+Cache hits require identical rendered model prompts and validation inputs. The manifest brief digest is a summary, not the complete cache identity; prompt or claim edits can trigger fresh calls. Legacy partial-brief model entries are not reused.
+
 Generated CSVs belong under `outputs/`; cache data belongs under `var/`. Both are excluded from Git because they can contain prospect or client information.

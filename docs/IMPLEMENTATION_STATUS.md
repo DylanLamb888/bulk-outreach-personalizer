@@ -53,6 +53,7 @@
 - Campaign-level blocked evidence phrases filtered before candidate selection
 - Focus-gap manifest reporting with separate unmatched and intentional-exclusion samples
 - Cache pruning via `--prune-cache`
+- Model cache identity includes complete rendered system/company prompts and validation inputs; legacy partial-brief entries miss safely
 - Per-row containment of title-hook gaps and fail-closed empty-subject and blank-company-name handling
 - Opt-in broad-campaign title-persona fallback for unmatched, unavailable, or explicitly permitted company evidence
 - Stable hashed company-name assignment for title fallback when a CSV has no usable website value

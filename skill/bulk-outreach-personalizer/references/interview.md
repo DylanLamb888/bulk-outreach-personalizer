@@ -64,7 +64,8 @@ Ask, in this order:
   `allow_expensive_models: true`.
 - Show the `estimated_nominal_usd_for_list` figure from `--validate-only` and
   agree a `max_nominal_usd` per run. Explain that an exhausted budget stops new
-  calls and the next run continues from the cache.
+  calls and the next run continues from the cache. Changed prompts, claims,
+  contact context, evidence, or validation limits require fresh model calls.
 
 ## 5. The email
 

@@ -4,6 +4,7 @@ import io
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -241,6 +242,57 @@ class ClassifierTests(unittest.TestCase):
             )
             changed.classify([item])
             self.assertEqual(len(transport.sent), 2)
+
+    def test_cache_does_not_reuse_decisions_after_request_or_validation_changes(self) -> None:
+        item = LlmFocusItem(
+            "benskin.example", "Benskin Talent Partners", SITE_TEXT,
+            "https://benskin.example/", job_title="Founder",
+        )
+        old_pitch = "You recruit finance leaders, so employers with open roles could be a useful next conversation."
+        new_pitch = "You connect finance leaders with employers planning their next hire."
+        changes = {
+            "offer": {"offer_service": "Recruitment software"},
+            "audience": {"offer_audience": "Finance directors"},
+            "approved claims": {"approved_claims": ("A free trial is available.",)},
+            "forbidden claims": {"forbidden_claims": ("Do not promise a free trial.",)},
+            "banned phrases": {"limits": replace(LIMITS, banned_phrases=("recruit",))},
+            "pitch limit": {"limits": replace(LIMITS, max_pitch_words=12)},
+            "source overlap limit": {"limits": replace(LIMITS, max_source_phrase_words=3)},
+            "evidence truncation": {"settings": replace(SETTINGS, max_evidence_chars=200)},
+            "company name": {"item": replace(item, company_name="Renamed Partners")},
+            "contact title": {"item": replace(item, job_title="Finance Director")},
+            "source URL": {"item": replace(item, source_url="https://benskin.example/services")},
+            "redirect note": {"item": replace(item, note="Check whether this is the same company.")},
+        }
+        for label, overrides in changes.items():
+            with self.subTest(change=label), tempfile.TemporaryDirectory() as tmp:
+                transport = RecordingTransport({item.domain: {**GOOD_RAW, "pitch": old_pitch}})
+                kwargs = {
+                    "settings": SETTINGS,
+                    "cache": JsonCache(Path(tmp) / "cache"),
+                    "transport": transport,
+                    "offer_service": "Done-for-you cold email",
+                    "offer_audience": "Owners",
+                    "limits": LIMITS,
+                }
+                first = LlmFocusClassifier(**kwargs).classify([item])[item.domain]
+                self.assertEqual(first.pitch, old_pitch)
+                transport.responses[item.domain] = {**GOOD_RAW, "pitch": new_pitch}
+                unchanged = LlmFocusClassifier(**kwargs).classify([item])[item.domain]
+                self.assertTrue(unchanged.from_cache)
+                self.assertEqual(unchanged.pitch, old_pitch)
+                self.assertEqual(len(transport.sent), 1)
+
+                changed_item = overrides.get("item", item)
+                kwargs.update({key: value for key, value in overrides.items() if key != "item"})
+                updated = LlmFocusClassifier(**kwargs).classify([changed_item])[item.domain]
+                self.assertFalse(updated.from_cache)
+                self.assertEqual(updated.pitch, new_pitch)
+                self.assertEqual(len(transport.sent), 2)
+                repeated = LlmFocusClassifier(**kwargs).classify([changed_item])[item.domain]
+                self.assertTrue(repeated.from_cache)
+                self.assertEqual(repeated.pitch, new_pitch)
+                self.assertEqual(len(transport.sent), 2)
 
     def test_transport_errors_are_reported_and_not_cached(self) -> None:
         item = LlmFocusItem("benskin.example", "Benskin", SITE_TEXT, "https://benskin.example/")
