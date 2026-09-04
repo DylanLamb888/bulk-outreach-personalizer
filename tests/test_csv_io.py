@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from bulk_enrich.csv_io import inspect_csv
+from bulk_enrich.csv_io import inspect_csv, load_csv
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +49,30 @@ class CsvInspectionTests(unittest.TestCase):
             self.assertEqual(summary.unique_domain_count, 0)
             self.assertNotIn("company_domain", summary.column_map)
             self.assertNotIn("company_website", summary.column_map)
+
+    def test_company_only_mode_accepts_domain_and_linkedin_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "companies.csv"
+            path.write_text(
+                "company_domain,Company LinkedIn URL\n"
+                "one.example,https://www.linkedin.com/company/one\n"
+                "two.example,https://www.linkedin.com/company/two\n",
+                encoding="utf-8",
+            )
+            summary = inspect_csv(path, company_only=True)
+            self.assertEqual(summary.row_count, 2)
+            self.assertEqual(summary.unique_domain_count, 2)
+            self.assertEqual(summary.unique_email_count, 0)
+            self.assertFalse(summary.email_status_present)
+            with self.assertRaisesRegex(ValueError, "email, first_name, company_name"):
+                load_csv(path)
+
+    def test_company_only_mode_still_requires_a_domain_or_website_column(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "companies.csv"
+            path.write_text("Company name\nOne\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "domain or website"):
+                inspect_csv(path, company_only=True)
 
 
 if __name__ == "__main__":

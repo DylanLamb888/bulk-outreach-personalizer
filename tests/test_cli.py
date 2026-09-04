@@ -105,6 +105,39 @@ class CliTests(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertIn("test_only", stderr.getvalue())
 
+    def test_company_qualification_validation_accepts_domain_only_csv(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = Path(tmp) / "companies.csv"
+            output_path = Path(tmp) / "qualified.csv"
+            input_path.write_text(
+                "company_domain,Company LinkedIn URL\n"
+                "one.example,https://www.linkedin.com/company/one\n",
+                encoding="utf-8",
+            )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = main(
+                    [
+                        "--input",
+                        str(input_path),
+                        "--output",
+                        str(output_path),
+                        "--campaign",
+                        str(ROOT / "campaigns" / "examples" / "scale-olympus.json"),
+                        "--company-qualification-only",
+                        "--validate-only",
+                    ]
+                )
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(code, 0)
+            self.assertEqual(payload["mode"], "company_qualification_only")
+            self.assertTrue(payload["copy_skipped"])
+            self.assertTrue(
+                payload["qualification"]["contact_and_email_gates_skipped"]
+            )
+            self.assertEqual(payload["title_hook_rules"], 0)
+            self.assertFalse(output_path.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

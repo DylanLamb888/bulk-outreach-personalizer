@@ -124,6 +124,40 @@
         {"header": "Company industry", "confidence": 0.72}
       ]
     },
+    "llm_focus": {
+      "enabled": false,
+      "provider": "claude-code",
+      "domains_per_call": 5,
+      "write_pitch": true,
+      "max_pitch_words": 30,
+      "max_nominal_usd": 20,
+      "allow_expensive_models": false,
+      "icp": "B2B service, software, or supply companies whose customers are other businesses and who sell through sales conversations, for example agencies, consultancies, managed IT, logistics, staffing, wholesale, and industrial services.",
+      "exclusions": "Law firms, private equity or venture investors, trade associations and chambers, consumer-only businesses, and companies whose site does not say what they sell.",
+      "model": "claude-opus-5",
+      "effort": "low",
+      "max_evidence_chars": 3000,
+      "examples": [
+        {
+          "site": "Midwest executive search in accounting, finance, HR, and supply chain",
+          "fit_tier": "core",
+          "focus": "executive search",
+          "buyer_phrase": "companies hiring senior finance leaders"
+        },
+        {
+          "site": "Promotional products and apparel with your logo",
+          "fit_tier": "core",
+          "focus": "branded merchandise",
+          "buyer_phrase": "businesses ordering branded merchandise"
+        },
+        {
+          "site": "Lawyers protecting employers",
+          "fit_tier": "exclude",
+          "focus": "employment law",
+          "buyer_phrase": "employers facing workplace claims"
+        }
+      ]
+    },
     "angles": [
       {
         "id": "buyer-conversation-angle",
@@ -178,7 +212,7 @@
     "preserve_spintax": true
   },
   "quality": {
-    "max_body_words": 55,
+    "max_body_words": 90,
     "max_subject_words": 5,
     "max_focus_words": 7,
     "max_buyer_phrase_words": 7,

@@ -14,6 +14,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Callable, Protocol
+from urllib.parse import urlsplit
 
 from bulk_enrich import __version__
 from bulk_enrich.cache import JsonCache
@@ -46,6 +47,15 @@ from bulk_enrich.focus import (
     longest_shared_phrase_words,
 )
 from bulk_enrich.hooks import TitleHookTable
+from bulk_enrich.llm_focus import (
+    RULE_ID as LLM_RULE_ID,
+    LlmFocusClassifier,
+    LlmFocusDecision,
+    LlmFocusError,
+    LlmFocusItem,
+    PhraseLimits,
+    build_transport,
+)
 from bulk_enrich.models import CompanyFact, SiteSignal
 from bulk_enrich.qualification import (
     QualificationResult,
@@ -84,6 +94,15 @@ class RunOptions:
     manifest_path: Path | None = None
     ready_output_path: Path | None = None
     review_output_path: Path | None = None
+    llm_mode: str = "sync"
+    llm_concurrency: int = 2
+    llm_poll_seconds: float = 30.0
+    llm_cache_ttl_hours: float = 720.0
+    llm_batch_ids: tuple[str, ...] = ()
+    llm_budget_usd: float | None = None
+
+
+LogCallback = Callable[[str], None]
 
 
 @dataclass(frozen=True)
@@ -108,6 +127,7 @@ class _RenderJob:
     source_evidence: str
     focus_rule: str
     angle: CopyAngle | None = None
+    max_pitch_words: int | None = None
 
 
 def sha256_file(path: str | Path) -> str:
@@ -339,8 +359,10 @@ def _build_copy(
     cta_variant: CtaVariant | None = None,
     offer_variant: OfferLineVariant | None = None,
     angle: CopyAngle | None = None,
+    max_pitch_words: int | None = None,
 ) -> RenderedCopy:
     angle = angle or _angle_for_signal(campaign, signal_type)
+    pitch_limit = max_pitch_words or campaign.max_words
     failures: list[str] = []
     applicable_ctas = _ctas_for_focus_rule(campaign.cta_variants, focus_rule)
     if cta_variant not in applicable_ctas:
@@ -398,9 +420,9 @@ def _build_copy(
     for template in _stable_template_order(angle.templates, domain):
         try:
             pitch = " ".join(render_template(template.pitch, context).strip().split())
-            if word_count(pitch) > campaign.max_words:
+            if word_count(pitch) > pitch_limit:
                 failures.append(
-                    f"{template.template_id}: pitch exceeds {campaign.max_words} words"
+                    f"{template.template_id}: pitch exceeds {pitch_limit} words"
                 )
                 continue
             if _opening_key(pitch, 2) == _opening_key(cta, 2):
@@ -476,6 +498,232 @@ def _primary_fact(signal: SiteSignal) -> CompanyFact:
         evidence=signal.evidence,
         source_url=signal.source_url,
         confidence=signal.confidence,
+    )
+
+
+_LLM_CLASSIFIABLE_STATUSES = frozenset({"ok", "no_signal", "redirect_mismatch"})
+
+
+def _llm_evidence_text(signal: SiteSignal | None) -> str:
+    """Website text a model may classify: fetched pages only, never CSV fields."""
+    if signal is None or signal.status not in _LLM_CLASSIFIABLE_STATUSES:
+        return ""
+    if signal.page_digest.strip():
+        return signal.page_digest
+    if signal.status != "ok":
+        return ""
+    parts = [fact.evidence for fact in signal.facts if fact.evidence]
+    if not parts and signal.evidence:
+        parts.append(signal.evidence)
+    return "\n".join(dict.fromkeys(parts))
+
+
+def _llm_note(signal: SiteSignal) -> str:
+    if signal.status == "redirect_mismatch":
+        host = urlsplit(signal.source_url).hostname or "another domain"
+        return (
+            f"this domain redirected to {host}. Decide whether that page describes the "
+            "same company under a new name. If it looks like a parked domain, a registrar "
+            "page, or an unrelated business, answer exclude."
+        )
+    return ""
+
+
+def _company_context_by_domain(
+    rows: list[dict[str, str]],
+    domains: list[str],
+    column_map: dict[str, str],
+    campaign: CampaignConfig,
+) -> dict[str, tuple[str, str]]:
+    """First company name and the highest-priority contact title per domain."""
+    names: dict[str, str] = {}
+    titles: dict[str, tuple[int, str]] = {}
+    name_header = column_map.get("company_name", "")
+    title_header = column_map.get("job_title", "")
+    for row, domain in zip(rows, domains, strict=True):
+        if not domain:
+            continue
+        name = row.get(name_header, "").strip() if name_header else ""
+        if name and not names.get(domain):
+            names[domain] = name
+        title = " ".join(row.get(title_header, "").split()) if title_header else ""
+        if title:
+            rank = _title_priority_rank(title, campaign)
+            if domain not in titles or rank > titles[domain][0]:
+                titles[domain] = (rank, title)
+    return {
+        domain: (names.get(domain, ""), titles.get(domain, (0, ""))[1])
+        for domain in set(names) | set(titles)
+    }
+
+
+def _classify_domains_with_llm(
+    campaign: CampaignConfig,
+    options: RunOptions,
+    domain_results: dict[str, SiteSignal],
+    company_context: dict[str, tuple[str, str]],
+    *,
+    classifier: LlmFocusClassifier | None = None,
+    cache: JsonCache | None = None,
+    log: LogCallback | None = None,
+) -> tuple[dict[str, LlmFocusDecision], dict[str, object]]:
+    """Run the opt-in model classifier once per readable unique domain."""
+    settings = campaign.llm_focus
+    if settings is None:
+        return {}, {"enabled": False}
+    if classifier is None:
+        if cache is None:
+            cache = JsonCache(options.cache_dir)
+        if options.llm_mode == "batch" and settings.provider != "api":
+            raise LlmFocusError(
+                "--llm-mode batch requires personalization.llm_focus.provider 'api'; "
+                f"provider '{settings.provider}' packs several domains per call instead"
+            )
+        transport = build_transport(
+            settings,
+            mode=options.llm_mode,
+            concurrency=options.llm_concurrency,
+            poll_seconds=options.llm_poll_seconds,
+            existing_batch_ids=tuple(options.llm_batch_ids),
+            log=log,
+            max_nominal_usd=options.llm_budget_usd,
+        )
+        offer = campaign.data["offer"]
+        classifier = LlmFocusClassifier(
+            settings,
+            cache=cache,
+            transport=transport,
+            offer_service=str(offer["service"]),
+            offer_audience=str(offer["audience"]),
+            limits=PhraseLimits(
+                max_focus_words=campaign.max_focus_words,
+                max_buyer_phrase_words=campaign.max_buyer_phrase_words,
+                banned_phrases=campaign.banned_phrases,
+                max_pitch_words=settings.max_pitch_words,
+                max_source_phrase_words=campaign.max_source_phrase_words,
+            ),
+            cache_ttl_hours=options.llm_cache_ttl_hours,
+            approved_claims=tuple(str(item) for item in offer.get("approved_claims", [])),
+            forbidden_claims=tuple(str(item) for item in offer.get("forbidden_claims", [])),
+        )
+    items = [
+        LlmFocusItem(
+            domain=domain,
+            company_name=company_context.get(domain, ("", ""))[0],
+            evidence_text=text,
+            source_url=signal.source_url,
+            note=_llm_note(signal),
+            job_title=company_context.get(domain, ("", ""))[1],
+        )
+        for domain, signal in domain_results.items()
+        if (text := _llm_evidence_text(signal))
+    ]
+    if log is not None and items:
+        log(
+            f"classifying {len(items)} readable domains with {settings.model} "
+            f"via {settings.provider}"
+        )
+    decisions = classifier.classify(items) if items else {}
+    return decisions, classifier.stats()
+
+
+def _llm_candidate(
+    decision: LlmFocusDecision,
+    signal: SiteSignal,
+) -> tuple[CompanyFact, CommercialFocusResult]:
+    fact = CompanyFact(
+        signal_type=decision.signal_type,
+        focus=decision.focus,
+        observation=f"your site describes {decision.focus}",
+        evidence=decision.evidence,
+        source_url=signal.source_url,
+        confidence=round(decision.confidence, 2),
+    )
+    focus = CommercialFocusResult(
+        source_focus=decision.focus,
+        focus=decision.focus,
+        buyer_phrase=decision.buyer_phrase,
+        rule_id=LLM_RULE_ID,
+        priority=-1,
+        fit_tier=decision.fit_tier,
+    )
+    return fact, focus
+
+
+def _resolve_focus_candidates(
+    facts: tuple[CompanyFact, ...],
+    *,
+    company_name: str,
+    commercial_focuses: CommercialFocusTable,
+    campaign: CampaignConfig,
+    llm_candidate: tuple[CompanyFact, CommercialFocusResult] | None = None,
+) -> tuple[
+    list[tuple[int, int, CompanyFact, CommercialFocusResult]],
+    list[str],
+]:
+    """Map every candidate fact to a focus; a usable model decision ranks first."""
+    resolved: list[tuple[int, int, CompanyFact, CommercialFocusResult]] = []
+    focus_errors: list[str] = []
+    for candidate_index, candidate in enumerate(facts):
+        if llm_candidate is not None and candidate is llm_candidate[0]:
+            resolved.append(
+                (llm_candidate[1].priority, candidate_index, candidate, llm_candidate[1])
+            )
+            continue
+        try:
+            resolved_focus = commercial_focuses.resolve(
+                company_name=company_name,
+                signal_type=candidate.signal_type,
+                source_focus=candidate.focus,
+                evidence=candidate.evidence,
+                max_focus_words=campaign.max_focus_words,
+                max_buyer_phrase_words=campaign.max_buyer_phrase_words,
+            )
+        except CommercialFocusError as exc:
+            focus_errors.append(str(exc))
+            continue
+        resolved.append((resolved_focus.priority, candidate_index, candidate, resolved_focus))
+    return resolved, focus_errors
+
+
+LLM_PITCH_ANGLE_ID = "llm-pitch"
+
+
+def _llm_pitch_angle(
+    campaign: CampaignConfig,
+    signal_type: str,
+    domain: str,
+) -> CopyAngle:
+    """One template whose pitch is the model's own sentence; subject stays approved."""
+    base = _angle_for_signal(campaign, signal_type)
+    subject = _stable_template_order(base.templates, domain)[0].subject
+    return CopyAngle(
+        angle_id=LLM_PITCH_ANGLE_ID,
+        signal_types=(signal_type,),
+        templates=(
+            CopyTemplate(template_id=LLM_PITCH_ANGLE_ID, subject=subject, pitch="{{llm_pitch}}"),
+        ),
+    )
+
+
+def _annotate_llm_reason(
+    result: QualificationResult,
+    decision: LlmFocusDecision | None,
+    selected_rule: str,
+) -> QualificationResult:
+    """Keep the model's own explanation, or its rejection, in the audit reason."""
+    if decision is None:
+        return result
+    if decision.usable and selected_rule == LLM_RULE_ID:
+        note = f"model: {decision.reason}" if decision.reason else "model decision"
+    elif not decision.usable:
+        note = f"model decision {decision.status}: {decision.error}"
+    else:
+        return result
+    return QualificationResult(
+        status=result.status,
+        rule=result.rule,
+        reason=f"{result.reason}; {note}" if result.reason else note,
     )
 
 
@@ -1162,25 +1410,127 @@ def _enrich_domains(
     return results
 
 
-def run_enrichment(
+DIGEST_FIELDS = [
+    "company_enrichment_status",
+    "company_enrichment_error",
+    "company_page_source",
+    "company_page_digest",
+]
+
+
+def run_digests(
     *,
     input_path: str | Path,
     output_path: str | Path,
-    campaign: CampaignConfig,
-    title_hooks: TitleHookTable,
-    commercial_focuses: CommercialFocusTable,
     options: RunOptions,
     progress: ProgressCallback | None = None,
     domain_enricher: DomainEnricher | None = None,
+    max_digest_chars: int = 1500,
 ) -> dict[str, object]:
+    """Fetch and summarise company pages with no campaign and no model.
+
+    Used by the setup interview to look at a sample of the list before an ICP
+    exists. Writes one row per input row with the page digest attached.
+    """
     started_at = datetime.now(UTC)
     started_monotonic = time.monotonic()
-    data = load_csv(input_path)
-    input_resolved = data.path
+    data = load_csv(input_path, company_only=True)
     output_resolved = Path(output_path).expanduser().resolve()
-    if input_resolved == output_resolved:
+    if data.path == output_resolved:
         raise ValueError("--output must be different from --input")
-    ready_output_resolved = (
+    domains = [domain_for_row(row, data.column_map) for row in data.rows]
+    unique_domains = list(dict.fromkeys(domain for domain in domains if domain))
+    fetcher: HttpFetcher | None = None
+    if domain_enricher is None:
+        cache = JsonCache(options.cache_dir)
+        fetcher = HttpFetcher(
+            cache,
+            FetcherSettings(
+                timeout=options.timeout,
+                retries=options.retries,
+                max_response_bytes=options.max_response_bytes,
+                cache_ttl_hours=options.cache_ttl_hours,
+                refresh_cache=options.refresh_cache,
+            ),
+        )
+        domain_enricher = SiteEnricher(
+            fetcher,
+            cache,
+            max_pages=options.max_pages,
+            cache_ttl_hours=options.cache_ttl_hours,
+            refresh_cache=options.refresh_cache,
+        )
+    domain_results = _enrich_domains(
+        unique_domains, domain_enricher, concurrency=options.concurrency, progress=progress
+    )
+    output_rows: list[dict[str, str]] = []
+    for row, domain in zip(data.rows, domains, strict=True):
+        signal = domain_results.get(domain) if domain else None
+        digest = _llm_evidence_text(signal) if signal is not None else ""
+        output_row = dict(row)
+        output_row.update(
+            {
+                "company_enrichment_status": signal.status if signal else "missing_domain",
+                "company_enrichment_error": signal.error if signal else "",
+                "company_page_source": signal.source_url if signal else "",
+                "company_page_digest": " ".join(digest.split())[:max_digest_chars],
+            }
+        )
+        output_rows.append(output_row)
+    write_enriched_csv(output_resolved, data.headers, output_rows, DIGEST_FIELDS)
+    status_counts = Counter(signal.status for signal in domain_results.values())
+    manifest: dict[str, object] = {
+        "tool": {"name": "bulk-enrich", "version": __version__},
+        "mode": "digest_only",
+        "run": {
+            "started_at": started_at.isoformat(),
+            "finished_at": datetime.now(UTC).isoformat(),
+            "duration_seconds": round(time.monotonic() - started_monotonic, 3),
+        },
+        "input": {**summarize_csv(data).to_dict(), "sha256": sha256_file(data.path)},
+        "output": {
+            "path": str(output_resolved),
+            "sha256": sha256_file(output_resolved),
+            "appended_fields": DIGEST_FIELDS,
+            "row_count": len(output_rows),
+        },
+        "domains": {
+            "unique": len(unique_domains),
+            "status_counts": dict(sorted(status_counts.items())),
+            "with_page_text": sum(
+                1 for signal in domain_results.values() if _llm_evidence_text(signal)
+            ),
+        },
+        "http": fetcher.stats() if fetcher is not None else {"test_double": True},
+    }
+    manifest_path = options.manifest_path or output_resolved.with_suffix(
+        output_resolved.suffix + ".manifest.json"
+    )
+    _atomic_json(manifest_path, manifest)
+    return manifest
+
+
+COMPANY_QUALIFICATION_FIELDS = [
+    "company_qualification_status",
+    "company_fit_status",
+    "company_fit_tier",
+    "company_fit_rule",
+    "company_fit_source",
+    "company_fit_evidence",
+    "company_fit_confidence",
+    "company_fit_reason",
+    "company_enrichment_status",
+    "company_enrichment_error",
+]
+
+
+def _company_output_paths(
+    input_path: Path,
+    output_path: str | Path,
+    options: RunOptions,
+) -> tuple[Path, Path | None, Path | None]:
+    output_resolved = Path(output_path).expanduser().resolve()
+    fit_output_resolved = (
         options.ready_output_path.expanduser().resolve()
         if options.ready_output_path is not None
         else None
@@ -1192,23 +1542,42 @@ def run_enrichment(
     )
     requested_outputs = [
         path
-        for path in (output_resolved, ready_output_resolved, review_output_resolved)
+        for path in (output_resolved, fit_output_resolved, review_output_resolved)
         if path is not None
     ]
-    if input_resolved in requested_outputs:
+    if input_path in requested_outputs:
         raise ValueError("output paths must differ from --input")
     if len(requested_outputs) != len(set(requested_outputs)):
         raise ValueError("--output, --ready-output, and --review-output must differ")
+    return output_resolved, fit_output_resolved, review_output_resolved
 
+
+def run_company_qualification(
+    *,
+    input_path: str | Path,
+    output_path: str | Path,
+    campaign: CampaignConfig,
+    commercial_focuses: CommercialFocusTable,
+    options: RunOptions,
+    progress: ProgressCallback | None = None,
+    domain_enricher: DomainEnricher | None = None,
+    llm_classifier: LlmFocusClassifier | None = None,
+    log: LogCallback | None = None,
+) -> dict[str, object]:
+    """Classify companies without invoking contact, email, or copy processing."""
+    started_at = datetime.now(UTC)
+    started_monotonic = time.monotonic()
+    data = load_csv(input_path, company_only=True)
+    input_resolved = data.path
+    output_resolved, fit_output_resolved, review_output_resolved = (
+        _company_output_paths(input_resolved, output_path, options)
+    )
     domains = [domain_for_row(row, data.column_map) for row in data.rows]
-    company_keys = [
-        _company_assignment_key(row, domain, data.column_map)
-        for row, domain in zip(data.rows, domains, strict=True)
-    ]
     unique_domains = list(dict.fromkeys(domain for domain in domains if domain))
 
     fetcher: HttpFetcher | None = None
     firecrawl_fetcher: FirecrawlFetcher | None = None
+    cache: JsonCache | None = None
     if domain_enricher is None:
         cache = JsonCache(options.cache_dir)
         fetcher = HttpFetcher(
@@ -1247,6 +1616,378 @@ def run_enrichment(
         domain_enricher,
         concurrency=options.concurrency,
         progress=progress,
+    )
+    llm_decisions, llm_stats = _classify_domains_with_llm(
+        campaign,
+        options,
+        domain_results,
+        _company_context_by_domain(data.rows, domains, data.column_map, campaign),
+        classifier=llm_classifier,
+        cache=cache,
+        log=log,
+    )
+
+    output_rows: list[dict[str, str]] = []
+    fit_counts: Counter[str] = Counter()
+    company_fit_counts: Counter[str] = Counter()
+    company_rule_counts: Counter[str] = Counter()
+    unmatched_samples: list[dict[str, str]] = []
+    excluded_samples: list[dict[str, str]] = []
+    unmatched_domains: set[str] = set()
+    excluded_domains: set[str] = set()
+    reported_domains: set[str] = set()
+
+    for row, domain in zip(data.rows, domains, strict=True):
+        output_row = dict(row)
+        context = context_for_row(row, data.column_map)
+        company_name = str(context.get("company_name", "")).strip() or domain
+        signal = domain_results.get(domain) if domain else None
+        fact: CompanyFact | None = None
+        commercial_focus: CommercialFocusResult | None = None
+        company_result = QualificationResult(
+            status="review",
+            rule="missing-company-domain",
+            reason="company domain or website is missing",
+        )
+
+        llm_decision = llm_decisions.get(domain) if domain else None
+        if domain and signal is not None:
+            facts = _candidate_facts(signal, row, campaign)
+            llm_candidate = None
+            if llm_decision is not None and llm_decision.usable:
+                llm_candidate = _llm_candidate(llm_decision, signal)
+                facts = (llm_candidate[0], *facts)
+            resolved_candidates, _focus_errors = _resolve_focus_candidates(
+                facts,
+                company_name=company_name,
+                commercial_focuses=commercial_focuses,
+                campaign=campaign,
+                llm_candidate=llm_candidate,
+            )
+            selected, corroborating_fields = _select_company_candidate(
+                resolved_candidates,
+                campaign,
+                website_available=signal.status == "ok" or llm_candidate is not None,
+            )
+            if selected is not None:
+                _priority, _index, fact, commercial_focus = selected
+                company_result = _annotate_llm_reason(
+                    qualify_company(
+                        fact,
+                        commercial_focus,
+                        corroborating_fields=corroborating_fields,
+                        fallback_min_agreeing_fields=campaign.fallback_min_agreeing_fields,
+                        min_confidence=campaign.min_confidence,
+                    ),
+                    llm_decision,
+                    commercial_focus.rule_id,
+                )
+            elif signal.status == "ok":
+                company_result = QualificationResult(
+                    status="excluded",
+                    rule="no-company-evidence",
+                    reason="no campaign-mapped company evidence was found",
+                )
+            else:
+                company_result = QualificationResult(
+                    status="review",
+                    rule="site-unavailable",
+                    reason=(
+                        "company website could not be qualified automatically"
+                        + (f": {signal.error}" if signal.error else "")
+                    ),
+                )
+
+        public_status = {
+            "qualified": "fit",
+            "review": "needs_review",
+            "excluded": "not_fit",
+        }[company_result.status]
+        fit_counts[public_status] += 1
+        company_fit_counts[company_result.status] += 1
+        company_rule_counts[company_result.rule] += 1
+        tier = commercial_focus.fit_tier if commercial_focus is not None else "none"
+        source = fact.source_url if fact is not None else (signal.source_url if signal else "")
+        evidence = fact.evidence if fact is not None else (signal.evidence if signal else "")
+        confidence = fact.confidence if fact is not None else (signal.confidence if signal else 0.0)
+        output_row.update(
+            {
+                "company_qualification_status": public_status,
+                "company_fit_status": company_result.status,
+                "company_fit_tier": tier,
+                "company_fit_rule": company_result.rule,
+                "company_fit_source": source,
+                "company_fit_evidence": evidence,
+                "company_fit_confidence": f"{confidence:.2f}",
+                "company_fit_reason": company_result.reason,
+                "company_enrichment_status": signal.status if signal else "missing_domain",
+                "company_enrichment_error": signal.error if signal else "",
+            }
+        )
+        output_rows.append(output_row)
+
+        if domain and domain not in reported_domains and public_status == "not_fit":
+            reported_domains.add(domain)
+            sample = {
+                "domain": domain,
+                "rule": company_result.rule,
+                "tier": tier,
+                "source": source,
+                "evidence": evidence[:240],
+            }
+            if tier == "exclude" and company_result.rule != "generic-compression":
+                excluded_domains.add(domain)
+                if len(excluded_samples) < 25:
+                    excluded_samples.append(sample)
+            else:
+                unmatched_domains.add(domain)
+                if len(unmatched_samples) < 25:
+                    unmatched_samples.append(sample)
+
+    fit_rows = [
+        row for row in output_rows if row["company_qualification_status"] == "fit"
+    ]
+    review_rows = [
+        row
+        for row in output_rows
+        if row["company_qualification_status"] == "needs_review"
+    ]
+    write_enriched_csv(
+        output_resolved,
+        data.headers,
+        output_rows,
+        COMPANY_QUALIFICATION_FIELDS,
+    )
+    if fit_output_resolved is not None:
+        write_enriched_csv(
+            fit_output_resolved,
+            data.headers,
+            fit_rows,
+            COMPANY_QUALIFICATION_FIELDS,
+        )
+    if review_output_resolved is not None:
+        write_enriched_csv(
+            review_output_resolved,
+            data.headers,
+            review_rows,
+            COMPANY_QUALIFICATION_FIELDS,
+        )
+
+    finished_at = datetime.now(UTC)
+    manifest_path = options.manifest_path or output_resolved.with_suffix(
+        output_resolved.suffix + ".manifest.json"
+    )
+    campaign_snapshot_path, campaign_sha256 = _immutable_snapshot(
+        campaign.path,
+        output_resolved,
+        "campaign",
+    )
+    focus_snapshot_path, focus_sha256 = _immutable_snapshot(
+        commercial_focuses.path,
+        output_resolved,
+        "focus",
+    )
+    domain_status_counts = Counter(signal.status for signal in domain_results.values())
+    manifest: dict[str, object] = {
+        "tool": {"name": "bulk-enrich", "version": __version__},
+        "mode": "company_qualification_only",
+        "campaign": {
+            "id": campaign.campaign_id,
+            "status": campaign.status,
+            "path": str(campaign.path),
+            "sha256": campaign_sha256,
+            "snapshot_path": str(campaign_snapshot_path),
+            "snapshot_sha256": campaign_sha256,
+        },
+        "run": {
+            "started_at": started_at.isoformat(),
+            "finished_at": finished_at.isoformat(),
+            "duration_seconds": round(time.monotonic() - started_monotonic, 3),
+        },
+        "input": {
+            **summarize_csv(data).to_dict(),
+            "sha256": sha256_file(input_resolved),
+        },
+        "output": {
+            "path": str(output_resolved),
+            "sha256": sha256_file(output_resolved),
+            "manifest_path": str(manifest_path),
+            "appended_fields": COMPANY_QUALIFICATION_FIELDS,
+            "status_counts": dict(sorted(fit_counts.items())),
+            "fit_output": (
+                {
+                    "path": str(fit_output_resolved),
+                    "sha256": sha256_file(fit_output_resolved),
+                    "row_count": len(fit_rows),
+                }
+                if fit_output_resolved is not None
+                else None
+            ),
+            "review_output": (
+                {
+                    "path": str(review_output_resolved),
+                    "sha256": sha256_file(review_output_resolved),
+                    "row_count": len(review_rows),
+                }
+                if review_output_resolved is not None
+                else None
+            ),
+        },
+        "domains": {
+            "unique": len(unique_domains),
+            "duplicate_rows_avoided": len([domain for domain in domains if domain])
+            - len(unique_domains),
+            "status_counts": dict(sorted(domain_status_counts.items())),
+            "signal_cache_hits": sum(
+                int(signal.signal_cache_hit) for signal in domain_results.values()
+            ),
+            "page_cache_hits": sum(
+                signal.http_cache_hits for signal in domain_results.values()
+            ),
+            "pages_fetched": sum(
+                signal.pages_fetched for signal in domain_results.values()
+            ),
+        },
+        "qualification": {
+            "status_counts": dict(sorted(fit_counts.items())),
+            "company_status_counts": dict(sorted(company_fit_counts.items())),
+            "company_rule_counts": dict(sorted(company_rule_counts.items())),
+            "contact_email_and_copy_skipped": True,
+        },
+        "focus_gaps": {
+            "unmatched_domains": len(unmatched_domains),
+            "unmatched_samples": unmatched_samples,
+            "excluded_domains": len(excluded_domains),
+            "excluded_samples": excluded_samples,
+        },
+        "llm_focus": llm_stats,
+        "settings": {
+            **asdict(options),
+            "cache_dir": str(options.cache_dir),
+            "manifest_path": str(manifest_path),
+            "ready_output_path": (
+                str(fit_output_resolved) if fit_output_resolved is not None else None
+            ),
+            "fit_output_path": (
+                str(fit_output_resolved) if fit_output_resolved is not None else None
+            ),
+            "review_output_path": (
+                str(review_output_resolved) if review_output_resolved is not None else None
+            ),
+            "commercial_focus_path": str(commercial_focuses.path),
+            "commercial_focus_sha256": focus_sha256,
+            "commercial_focus_snapshot_path": str(focus_snapshot_path),
+            "commercial_focus_snapshot_sha256": focus_sha256,
+            "commercial_focus_rules": len(commercial_focuses.rules),
+        },
+        "http": fetcher.stats() if fetcher is not None else {"test_double": True},
+        "firecrawl": (
+            firecrawl_fetcher.stats()
+            if firecrawl_fetcher is not None
+            else {"enabled": False}
+        ),
+    }
+    _atomic_json(manifest_path, manifest)
+    return manifest
+
+
+def run_enrichment(
+    *,
+    input_path: str | Path,
+    output_path: str | Path,
+    campaign: CampaignConfig,
+    title_hooks: TitleHookTable,
+    commercial_focuses: CommercialFocusTable,
+    options: RunOptions,
+    progress: ProgressCallback | None = None,
+    domain_enricher: DomainEnricher | None = None,
+    llm_classifier: LlmFocusClassifier | None = None,
+    log: LogCallback | None = None,
+) -> dict[str, object]:
+    started_at = datetime.now(UTC)
+    started_monotonic = time.monotonic()
+    data = load_csv(input_path)
+    input_resolved = data.path
+    output_resolved = Path(output_path).expanduser().resolve()
+    if input_resolved == output_resolved:
+        raise ValueError("--output must be different from --input")
+    ready_output_resolved = (
+        options.ready_output_path.expanduser().resolve()
+        if options.ready_output_path is not None
+        else None
+    )
+    review_output_resolved = (
+        options.review_output_path.expanduser().resolve()
+        if options.review_output_path is not None
+        else None
+    )
+    requested_outputs = [
+        path
+        for path in (output_resolved, ready_output_resolved, review_output_resolved)
+        if path is not None
+    ]
+    if input_resolved in requested_outputs:
+        raise ValueError("output paths must differ from --input")
+    if len(requested_outputs) != len(set(requested_outputs)):
+        raise ValueError("--output, --ready-output, and --review-output must differ")
+
+    domains = [domain_for_row(row, data.column_map) for row in data.rows]
+    company_keys = [
+        _company_assignment_key(row, domain, data.column_map)
+        for row, domain in zip(data.rows, domains, strict=True)
+    ]
+    unique_domains = list(dict.fromkeys(domain for domain in domains if domain))
+
+    fetcher: HttpFetcher | None = None
+    firecrawl_fetcher: FirecrawlFetcher | None = None
+    cache: JsonCache | None = None
+    if domain_enricher is None:
+        cache = JsonCache(options.cache_dir)
+        fetcher = HttpFetcher(
+            cache,
+            FetcherSettings(
+                timeout=options.timeout,
+                retries=options.retries,
+                max_response_bytes=options.max_response_bytes,
+                cache_ttl_hours=options.cache_ttl_hours,
+                refresh_cache=options.refresh_cache,
+            ),
+        )
+        if options.firecrawl_fallback:
+            firecrawl_fetcher = FirecrawlFetcher(
+                cache,
+                FirecrawlSettings(
+                    api_url=options.firecrawl_api_url,
+                    api_key=os.environ.get("FIRECRAWL_API_KEY", ""),
+                    timeout=options.firecrawl_timeout,
+                    max_concurrency=options.firecrawl_concurrency,
+                    cache_ttl_hours=options.cache_ttl_hours,
+                    refresh_cache=options.refresh_cache,
+                ),
+            )
+        domain_enricher = SiteEnricher(
+            fetcher,
+            cache,
+            max_pages=options.max_pages,
+            cache_ttl_hours=options.cache_ttl_hours,
+            refresh_cache=options.refresh_cache,
+            fallback_fetcher=firecrawl_fetcher,
+        )
+
+    domain_results = _enrich_domains(
+        unique_domains,
+        domain_enricher,
+        concurrency=options.concurrency,
+        progress=progress,
+    )
+    llm_decisions, llm_stats = _classify_domains_with_llm(
+        campaign,
+        options,
+        domain_results,
+        _company_context_by_domain(data.rows, domains, data.column_map, campaign),
+        classifier=llm_classifier,
+        cache=cache,
+        log=log,
     )
 
     append_fields = list(campaign.data["output"]["append_fields"])
@@ -1335,14 +2076,20 @@ def run_enrichment(
         corroborating_fields: tuple[str, ...] = ()
         fallback_basis = ""
         fallback_angle: CopyAngle | None = None
+        pitch_word_limit: int | None = None
         hook = None
 
+        llm_decision = llm_decisions.get(domain) if domain else None
         if not company_name:
             errors.append("missing company name")
         elif not domain:
             errors.append("missing company domain or website")
         else:
             facts = _candidate_facts(signal, row, campaign)
+            llm_candidate = None
+            if llm_decision is not None and llm_decision.usable:
+                llm_candidate = _llm_candidate(llm_decision, signal)
+                facts = (llm_candidate[0], *facts)
             if not facts:
                 errors.append(
                     signal.error
@@ -1350,44 +2097,33 @@ def run_enrichment(
                     else "domain enrichment did not return a usable result"
                 )
             else:
-                focus_errors: list[str] = []
-                resolved_candidates: list[
-                    tuple[int, int, CompanyFact, CommercialFocusResult]
-                ] = []
-                for candidate_index, candidate in enumerate(facts):
-                    try:
-                        resolved_focus = commercial_focuses.resolve(
-                            company_name=company_name,
-                            signal_type=candidate.signal_type,
-                            source_focus=candidate.focus,
-                            evidence=candidate.evidence,
-                            max_focus_words=campaign.max_focus_words,
-                            max_buyer_phrase_words=campaign.max_buyer_phrase_words,
-                        )
-                    except CommercialFocusError as exc:
-                        focus_errors.append(str(exc))
-                        continue
-                    resolved_candidates.append(
-                        (
-                            resolved_focus.priority,
-                            candidate_index,
-                            candidate,
-                            resolved_focus,
-                        )
-                    )
+                resolved_candidates, focus_errors = _resolve_focus_candidates(
+                    facts,
+                    company_name=company_name,
+                    commercial_focuses=commercial_focuses,
+                    campaign=campaign,
+                    llm_candidate=llm_candidate,
+                )
                 selected_candidate, corroborating_fields = _select_company_candidate(
                     resolved_candidates,
                     campaign,
-                    website_available=signal is not None and signal.status == "ok",
+                    website_available=(
+                        (signal is not None and signal.status == "ok")
+                        or llm_candidate is not None
+                    ),
                 )
                 if selected_candidate is not None:
                     _priority, _index, fact, commercial_focus = selected_candidate
-                    company_result = qualify_company(
-                        fact,
-                        commercial_focus,
-                        corroborating_fields=corroborating_fields,
-                        fallback_min_agreeing_fields=campaign.fallback_min_agreeing_fields,
-                        min_confidence=campaign.min_confidence,
+                    company_result = _annotate_llm_reason(
+                        qualify_company(
+                            fact,
+                            commercial_focus,
+                            corroborating_fields=corroborating_fields,
+                            fallback_min_agreeing_fields=campaign.fallback_min_agreeing_fields,
+                            min_confidence=campaign.min_confidence,
+                        ),
+                        llm_decision,
+                        commercial_focus.rule_id,
                     )
                 else:
                     unique_focus_errors = list(dict.fromkeys(focus_errors))
@@ -1557,6 +2293,20 @@ def run_enrichment(
                 values["personalization_status"] = campaign.fallback_copy_status
             else:
                 values["personalization_status"] = "review" if low_confidence else "ready"
+            if (
+                fallback_angle is None
+                and llm_decision is not None
+                and llm_decision.usable
+                and llm_decision.pitch
+                and commercial_focus.rule_id == LLM_RULE_ID
+                and campaign.llm_focus is not None
+                and campaign.llm_focus.write_pitch
+            ):
+                context["llm_pitch"] = llm_decision.pitch
+                fallback_angle = _llm_pitch_angle(campaign, fact.signal_type, company_key)
+                pitch_word_limit = campaign.llm_focus.max_pitch_words
+            elif llm_decision is not None and llm_decision.usable and llm_decision.pitch_error:
+                errors.append(f"model pitch rejected: {llm_decision.pitch_error}")
 
         values["personalization_error"] = "; ".join(error for error in errors if error)
         output_row.update(values)
@@ -1571,6 +2321,7 @@ def run_enrichment(
                     source_evidence=fact.evidence,
                     focus_rule=commercial_focus.rule_id,
                     angle=fallback_angle,
+                    max_pitch_words=pitch_word_limit,
                 )
             )
 
@@ -1597,6 +2348,7 @@ def run_enrichment(
                 cta_variant=cta_by_company[job.assignment_key],
                 offer_variant=offer_line_by_company[job.assignment_key],
                 angle=job.angle,
+                max_pitch_words=job.max_pitch_words,
             )
             job.row["personalized_subject"] = rendered.subject
             job.row[campaign.output_field] = rendered.pitch
@@ -1727,6 +2479,7 @@ def run_enrichment(
     )
     manifest: dict[str, object] = {
         "tool": {"name": "bulk-enrich", "version": __version__},
+        "mode": "outreach_personalization",
         "campaign": {
             "id": campaign.campaign_id,
             "status": campaign.status,
@@ -1804,6 +2557,7 @@ def run_enrichment(
             "excluded_domains": len(excluded_domains),
             "excluded_samples": excluded_samples,
         },
+        "llm_focus": llm_stats,
         "settings": {
             **asdict(options),
             "cache_dir": str(options.cache_dir),

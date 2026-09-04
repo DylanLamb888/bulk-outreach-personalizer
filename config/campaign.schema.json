@@ -18,19 +18,34 @@
     "output"
   ],
   "properties": {
-    "schema_version": { "const": "3.0" },
+    "schema_version": {
+      "const": "3.0"
+    },
     "campaign_id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
     },
-    "status": { "enum": ["test_only", "approved"] },
-    "client_name": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": [
+        "test_only",
+        "approved"
+      ]
+    },
+    "client_name": {
+      "type": "string",
+      "minLength": 1
+    },
     "sender": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1 }
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "offer": {
@@ -45,48 +60,77 @@
         "forbidden_claims"
       ],
       "properties": {
-        "service": { "type": "string", "minLength": 1 },
-        "audience": { "type": "string", "minLength": 1 },
-        "risk_reversal": { "type": "string" },
+        "service": {
+          "type": "string",
+          "minLength": 1
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "risk_reversal": {
+          "type": "string"
+        },
         "risk_reversal_variants": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "text"],
+            "required": [
+              "id",
+              "text"
+            ],
             "properties": {
               "id": {
                 "type": "string",
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
               },
-              "text": { "type": "string", "minLength": 1 },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
               "focus_rules": {
                 "type": "array",
                 "minItems": 1,
-                "items": { "type": "string", "minLength": 1 },
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "uniqueItems": true
               }
             }
           },
           "uniqueItems": true
         },
-        "cta": { "type": "string", "minLength": 1 },
+        "cta": {
+          "type": "string",
+          "minLength": 1
+        },
         "cta_variants": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "text"],
+            "required": [
+              "id",
+              "text"
+            ],
             "properties": {
               "id": {
                 "type": "string",
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
               },
-              "text": { "type": "string", "minLength": 1 },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
               "focus_rules": {
                 "type": "array",
                 "minItems": 1,
-                "items": { "type": "string", "minLength": 1 },
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "uniqueItems": true
               }
             }
@@ -95,12 +139,18 @@
         },
         "approved_claims": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "minItems": 1
         },
         "forbidden_claims": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "minItems": 1
         }
       }
@@ -108,12 +158,19 @@
     "qualification": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["company", "contact", "email"],
+      "required": [
+        "company",
+        "contact",
+        "email"
+      ],
       "properties": {
         "company": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["fallback_min_agreeing_fields", "fallback_fields"],
+          "required": [
+            "fallback_min_agreeing_fields",
+            "fallback_fields"
+          ],
           "properties": {
             "fallback_min_agreeing_fields": {
               "type": "integer",
@@ -122,7 +179,10 @@
             },
             "fallback_fields": {
               "type": "array",
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             }
           }
@@ -142,34 +202,52 @@
             "priority_title_patterns": {
               "type": "array",
               "minItems": 1,
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             },
             "ready_title_patterns": {
               "type": "array",
               "minItems": 1,
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             },
             "review_title_patterns": {
               "type": "array",
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             },
             "exclude_title_patterns": {
               "type": "array",
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             },
             "ready_seniorities": {
               "type": "array",
               "minItems": 1,
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             },
             "review_seniorities": {
               "type": "array",
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             }
           }
@@ -187,21 +265,36 @@
             "accepted_statuses": {
               "type": "array",
               "minItems": 1,
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             },
             "review_statuses": {
               "type": "array",
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             },
             "rejected_statuses": {
               "type": "array",
               "minItems": 1,
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             },
-            "missing_status_action": { "enum": ["syntax", "review", "exclude"] }
+            "missing_status_action": {
+              "enum": [
+                "syntax",
+                "review",
+                "exclude"
+              ]
+            }
           }
         }
       }
@@ -220,41 +313,80 @@
         "angles"
       ],
       "properties": {
-        "objective": { "type": "string", "minLength": 1 },
-        "output_field": { "type": "string", "minLength": 1 },
-        "focus_rules_file": { "type": "string", "minLength": 1 },
-        "max_words": { "type": "integer", "minimum": 5, "maximum": 100 },
+        "objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "focus_rules_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_words": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 100
+        },
         "min_confidence": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
         },
-        "low_confidence_action": { "enum": ["review", "blank"] },
+        "low_confidence_action": {
+          "enum": [
+            "review",
+            "blank"
+          ]
+        },
         "banned_phrases": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "uniqueItems": true
         },
         "blocked_evidence_phrases": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "uniqueItems": true
         },
         "row_fallback": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["enabled", "fields"],
+          "required": [
+            "enabled",
+            "fields"
+          ],
           "properties": {
-            "enabled": { "type": "boolean" },
+            "enabled": {
+              "type": "boolean"
+            },
             "fields": {
               "type": "array",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["header", "confidence"],
+                "required": [
+                  "header",
+                  "confidence"
+                ],
                 "properties": {
-                  "header": { "type": "string", "minLength": 1 },
-                  "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+                  "header": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
                 }
               }
             }
@@ -263,20 +395,44 @@
         "fallback_copy": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["enabled", "status", "templates"],
+          "required": [
+            "enabled",
+            "status",
+            "templates"
+          ],
           "properties": {
-            "enabled": { "type": "boolean" },
-            "status": { "enum": ["ready", "review"] },
-            "allow_unmatched_company": { "type": "boolean" },
-            "allow_single_csv_field": { "type": "boolean" },
-            "allow_explicit_company_exclusions": { "type": "boolean" },
-            "promote_company_review": { "type": "boolean" },
+            "enabled": {
+              "type": "boolean"
+            },
+            "status": {
+              "enum": [
+                "ready",
+                "review"
+              ]
+            },
+            "allow_unmatched_company": {
+              "type": "boolean"
+            },
+            "allow_single_csv_field": {
+              "type": "boolean"
+            },
+            "allow_explicit_company_exclusions": {
+              "type": "boolean"
+            },
+            "promote_company_review": {
+              "type": "boolean"
+            },
             "templates": {
               "type": "array",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["id", "personas", "subject", "pitch"],
+                "required": [
+                  "id",
+                  "personas",
+                  "subject",
+                  "pitch"
+                ],
                 "properties": {
                   "id": {
                     "type": "string",
@@ -285,11 +441,20 @@
                   "personas": {
                     "type": "array",
                     "minItems": 1,
-                    "items": { "type": "string", "minLength": 1 },
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "uniqueItems": true
                   },
-                  "subject": { "type": "string", "minLength": 1 },
-                  "pitch": { "type": "string", "minLength": 1 }
+                  "subject": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "pitch": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 }
               }
             }
@@ -301,7 +466,11 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "signal_types", "templates"],
+            "required": [
+              "id",
+              "signal_types",
+              "templates"
+            ],
             "properties": {
               "id": {
                 "type": "string",
@@ -310,7 +479,10 @@
               "signal_types": {
                 "type": "array",
                 "minItems": 1,
-                "items": { "type": "string", "minLength": 1 },
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "uniqueItems": true
               },
               "templates": {
@@ -319,17 +491,134 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["id", "subject", "pitch"],
+                  "required": [
+                    "id",
+                    "subject",
+                    "pitch"
+                  ],
                   "properties": {
                     "id": {
                       "type": "string",
                       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                     },
-                    "subject": { "type": "string", "minLength": 1 },
-                    "pitch": { "type": "string", "minLength": 1 }
+                    "subject": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "pitch": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   }
                 }
               }
+            }
+          }
+        },
+        "llm_focus": {
+          "type": "object",
+          "description": "Opt-in Claude classification of each unique company domain. Never per row; cached by domain, model, and brief.",
+          "additionalProperties": false,
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "icp": {
+              "type": "string",
+              "minLength": 1
+            },
+            "exclusions": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "effort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
+            "max_evidence_chars": {
+              "type": "integer",
+              "minimum": 500,
+              "maximum": 12000
+            },
+            "examples": {
+              "type": "array",
+              "maxItems": 12,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "site",
+                  "fit_tier",
+                  "focus",
+                  "buyer_phrase"
+                ],
+                "properties": {
+                  "site": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fit_tier": {
+                    "type": "string",
+                    "enum": [
+                      "core",
+                      "secondary",
+                      "exclude"
+                    ]
+                  },
+                  "focus": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "buyer_phrase": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "provider": {
+              "type": "string",
+              "enum": [
+                "claude-code",
+                "codex",
+                "api"
+              ],
+              "description": "claude-code uses the local Claude Code login (default); codex uses the Codex CLI login; api uses the Anthropic SDK."
+            },
+            "domains_per_call": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "write_pitch": {
+              "type": "boolean",
+              "description": "Let the model write the personalised opening pitch per company; offer line and CTA stay approved variants."
+            },
+            "max_pitch_words": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 60
+            },
+            "max_nominal_usd": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Stop submitting new model calls once the run's nominal usage reaches this amount."
+            },
+            "allow_expensive_models": {
+              "type": "boolean",
+              "description": "Required to use Fable or Mythos tier models."
             }
           }
         }
@@ -338,10 +627,18 @@
     "email": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["body", "preserve_spintax"],
+      "required": [
+        "body",
+        "preserve_spintax"
+      ],
       "properties": {
-        "body": { "type": "string", "minLength": 1 },
-        "preserve_spintax": { "type": "boolean" }
+        "body": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preserve_spintax": {
+          "type": "boolean"
+        }
       }
     },
     "quality": {
@@ -365,41 +662,110 @@
         "repetition_action"
       ],
       "properties": {
-        "max_body_words": { "type": "integer", "minimum": 10, "maximum": 200 },
-        "max_subject_words": { "type": "integer", "minimum": 1, "maximum": 20 },
-        "max_focus_words": { "type": "integer", "minimum": 2, "maximum": 12 },
-        "max_buyer_phrase_words": { "type": "integer", "minimum": 2, "maximum": 16 },
-        "max_source_phrase_words": { "type": "integer", "minimum": 2, "maximum": 10 },
-        "max_cta_words": { "type": "integer", "minimum": 3, "maximum": 20 },
-        "max_offer_line_words": { "type": "integer", "minimum": 3, "maximum": 40 },
-        "opening_words": { "type": "integer", "minimum": 2, "maximum": 8 },
-        "max_opening_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-        "max_exact_pitch_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "max_body_words": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 200
+        },
+        "max_subject_words": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "max_focus_words": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 12
+        },
+        "max_buyer_phrase_words": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16
+        },
+        "max_source_phrase_words": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 10
+        },
+        "max_cta_words": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 20
+        },
+        "max_offer_line_words": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 40
+        },
+        "opening_words": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 8
+        },
+        "max_opening_share": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "max_exact_pitch_share": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
         "max_buyer_phrase_share": {
           "anyOf": [
-            { "type": "null" },
-            { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            }
           ]
         },
-        "max_cta_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-        "max_offer_line_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-        "min_rows": { "type": "integer", "minimum": 2 },
-        "repetition_action": { "enum": ["warn", "review"] }
+        "max_cta_share": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "max_offer_line_share": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "min_rows": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "repetition_action": {
+          "enum": [
+            "warn",
+            "review"
+          ]
+        }
       }
     },
     "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["append_fields"],
+      "required": [
+        "append_fields"
+      ],
       "properties": {
         "append_fields": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "minItems": 1,
           "uniqueItems": true
         }
       }
     },
-    "notes": { "type": "string" }
+    "notes": {
+      "type": "string"
+    }
   }
 }

@@ -1,33 +1,43 @@
 ---
 name: bulk-outreach-personalizer
-description: Validate and run deterministic bulk public-website enrichment for Smartlead or ListKit CSVs using offer-agnostic campaign JSON. Use for high-volume outreach personalization without per-row LLM calls, campaign configuration, cached enrichment runs, or import-ready output review.
+description: Turn a lead CSV into upload-ready, prospect-specific cold email for Smartlead or ListKit. Interviews the operator about the offer, reads a sample of the companies, drafts the campaign, then runs a cached, budgeted, one-call-per-company personalisation engine on the operator's own Claude or ChatGPT subscription. Use when someone hands over a lead list and wants it personalised, when a client campaign needs setting up, or when reviewing ready and review outputs.
 ---
 
 # Bulk Outreach Personalizer
 
-Use the repository CLI. Do not write one-off per-row prompts or dispatch an agent for each lead.
+The operator hands you a CSV. You run the conversation, the engine runs the list. Never write per-row emails yourself, never dispatch an agent per lead, and never send anything.
 
-Resolve the repository root as two directories above this `SKILL.md`, including when this Skill is reached through a symlink. Run the deterministic entrypoint at `<repository-root>/scripts/enrich.py`; do not assume the user's current working directory is the repository.
+Resolve the repository root as two directories above this `SKILL.md`, including when reached through a symlink. The entrypoint is `<repository-root>/scripts/enrich.py`; do not assume the current working directory is the repository.
+
+## How it works in one breath
+
+Each unique company website is fetched once and cached. For each company, one model call, packed several companies at a time through the operator's Claude Code login, decides whether the company fits the plain-English target, quotes the sentence that proves it, and writes one personalised opening pitch. The engine checks the quote is really on the page, runs every phrase through the deterministic copy gates, drops the approved offer line and call to action under the pitch, qualifies the contact and email, balances variants across the batch, and writes ready, review, and audit files. Rejected model output falls back to the regex focus rules, never to invented copy.
 
 ## Workflow
 
-1. Confirm the input CSV, output path, and client campaign JSON.
-2. For a new client, inspect 10–20 representative domains plus adjacent negative examples. Draft the campaign's `core`, `secondary`, and `exclude` company rules, required contact titles/seniorities, accepted email statuses, and approved CSV fallback fields. Show these rules to the user and obtain approval before freezing them. This setup assistance may use Claude or Codex; the bulk CLI must never make per-row AI calls.
-3. Copy both `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`. Rename both, point `personalization.focus_rules_file` at the adjacent CSV, and add only approved qualification rules, offer claims, restrictions, sender, offer-line variants, CTA variants, and copy.
-4. Run `--validate-only` and report row count, detected qualification columns, missing verification values, duplicate emails, unique domains, duplicate-domain savings, rule tiers, and campaign status.
-5. Run a small test with `--allow-test-campaign`; inspect company, contact, email, copy, and final outreach statuses alongside their rules, evidence, reasons, and final emails. Include unseen holdout and adjacent-negative examples.
-6. Review the manifest's `focus_gaps.unmatched_samples` first and add or adjust focus rules for genuinely in-market domains. Audit `focus_gaps.excluded_samples` separately for false exclusions, put site-specific junk sentences in `personalization.blocked_evidence_phrases`, and re-run the test; cached pages make re-runs cheap.
-7. Do not mark a campaign `approved` without the user's qualification and copy approval.
-8. Run the full list with separate audit, ready, and review outputs. Report `ready`, `review`, `excluded`, and `error` counts plus duplicate exclusions and later-wave company contacts.
-9. Treat only `outreach_status=ready` rows as upload-ready. The ready file must contain no more than one contact per company domain; additional eligible contacts belong in review for later waves. Never upload or send automatically.
+1. **Take the CSV.** Confirm the path and that it carries email, first name, job title, company name, and a website or domain. Ask whether this is for the operator's own agency or a client, and who the sender is.
+2. **Interview the operator.** Follow `references/interview.md`: the offer in one sentence, who buys it, approved proof, the risk reversal, a value-based call to action, and anything never to be said. Confirm each answer before moving on.
+3. **Read the market before describing it.** Run digest mode on the first 20 to 40 rows so you see what the companies say about themselves, then draft the plain-English target, exclusions, and three to six examples. Read the draft back and change it until the operator approves.
+4. **Write the campaign file.** Copy `campaigns/campaign-template.json` and `campaigns/campaign-template-focus.csv` into `campaigns/local/`, rename them, and fill every interview answer into the JSON. Set `personalization.llm_focus.enabled` to true. Leave `provider` as `claude-code` unless the operator wants their ChatGPT subscription (`codex`). Keep `status` as `test_only`.
+5. **Choose model and budget together.** Default `claude-opus-5` at low effort; offer `claude-sonnet-5` for very large lists. Never set a Fable or Mythos model without an explicit request; it needs `allow_expensive_models: true` and drains usage several times faster. Run `--validate-only`, show `llm_focus.estimated_nominal_usd_for_list` and `provider_ready`, and agree `max_nominal_usd` per run.
+6. **Run a sample.** Take 20 to 50 rows with `--allow-test-campaign`, then read complete emails aloud: subject, pitch, offer line, CTA. Check `company_fit_evidence` is a real sentence from the site, `company_fit_reason` makes sense, and `personalization_error` for rejected pitches. Fix the brief, examples, or copy limits and rerun; cached companies cost nothing.
+7. **Get approval, then run the list.** Only after the operator approves the target, claims, offer line, CTA, and sample emails, set `status` to `approved` and run with separate audit, ready, and review outputs. Report `ready`, `review`, `excluded`, and `error` counts, the `llm_focus` counts, `nominal_cost_usd`, and whether the budget was exhausted. An exhausted budget means rerun; it continues from the cache.
+8. **Hand over.** Only `outreach_status=ready` rows are upload-ready, one contact per company. Review rows stay out until a human approves them; later-wave contacts wait until the first contact finishes the sequence. Map `personalized_subject` and `personalized_email` in Smartlead or ListKit.
 
-When configured, the engine uses input-CSV company intelligence only when first-party website evidence is unavailable. Strict campaigns keep a readable website with no campaign match excluded rather than rescuing it with CSV enrichment. Broad campaigns may explicitly enable `personalization.fallback_copy` to use approved title-persona copy, accept one mapped CSV field, or promote review evidence. This mode also supports lists with no usable website value by assigning variants and company-contact waves from a stable company-name key. Explicit company exclusions require their own opt-in and must not be overridden accidentally. The audit source must remain `input:<header>` so website, title, and supplied-data evidence are never confused.
+## Modes and flags
 
-Keep direct HTTP as the default. When Firecrawl is configured, enable `--firecrawl-fallback` only as a second pass for failed or weak pages. The CLI reads a self-hosted `FIRECRAWL_API_URL` from the repository's ignored `.env` file; shell variables take precedence. Hosted use reads `FIRECRAWL_API_KEY` from the shell environment. Never request, print, persist, or place API keys in campaign files or CLI arguments. Report the direct and Firecrawl request/cache counts separately from the manifest.
+- `--digest-only`: fetch pages and write `company_page_digest` per row, no campaign, no model. Use it for step 3.
+- `--validate-only`: check CSV, campaign, provider readiness, and the usage estimate without fetching.
+- `--company-qualification-only`: fit, needs_review, and not_fit per company with no contacts or copy, when the operator only wants to know who belongs on the list.
+- `--llm-budget-usd`: override the campaign's per-run budget. `--llm-concurrency` defaults to 2 calls at a time.
+- `--firecrawl-fallback`: second pass for JavaScript-only sites when Firecrawl is configured.
 
-The engine accesses public websites only, blocks local/private network targets, caches per domain, preserves input row order, and never sends campaigns. It can also consume explicitly configured company-description fields already present in the supplied CSV. It keeps evidence for audit but uses one short commercial category in the email. It does not treat random synonym changes as personalization.
+## Rules that do not bend
 
-Do not add niche or client logic to Python. M&A, CFO, recruitment, and other market terms belong only in the campaign's declared focus-rule CSV. Universal engine checks may reject vague, copied, incomplete, stacked, or semantically awkward language without naming a niche.
+- The model classifies and writes the opening only. The offer line, CTA, claims, and subject come from approved variants. It never invents results, numbers, customers, or prospect intent.
+- Every model decision must quote its evidence verbatim; the engine rejects anything else.
+- Never place API keys or tokens in campaign files or CLI arguments. Providers use the operator's own CLI login.
+- Do not add niche or client logic to Python. Market terms live in the campaign JSON and focus CSV.
+- CSV company intelligence is used only when the website is unavailable, and it stays review-only unless the campaign explicitly broadens it.
 
-Read `references/usage.md` when creating a campaign or interpreting output fields.
-Read `references/copy-quality.md` when writing or reviewing campaign copy.
+Read `references/interview.md` for the question script, `references/usage.md` for every campaign field and output column, and `references/copy-quality.md` when judging copy.

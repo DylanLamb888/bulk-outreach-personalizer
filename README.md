@@ -2,9 +2,9 @@
 
 # Bulk Enrich
 
-### Deterministic outreach personalisation at CSV scale
+### Prospect-specific outreach personalisation at CSV scale
 
-Turn lead lists into auditable, upload-ready outreach files using public website evidence, campaign rules, reusable copy templates, and aggressive caching. No per-row LLM calls.
+Hand over a lead list, answer a few questions about the offer, and get back auditable, upload-ready outreach files. Each company's public website is read once, one model decision per company classifies fit and writes the opening line on your own Claude or ChatGPT subscription, and a deterministic engine checks every word before it reaches the ready file. No API keys, no per-row LLM calls.
 
 [![Tests](https://github.com/DylanLamb888/bulk-enrich/actions/workflows/tests.yml/badge.svg)](https://github.com/DylanLamb888/bulk-enrich/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
@@ -19,32 +19,35 @@ Turn lead lists into auditable, upload-ready outreach files using public website
 
 ## What this is
 
-Bulk Enrich is a reusable Claude Code and Codex Skill backed by a deterministic Python CLI. It is designed for large outreach lists where calling an LLM once per prospect would be slow, expensive, and difficult to audit.
+Bulk Enrich is a reusable Claude Code and Codex Skill backed by a Python CLI. Think of it as a self-hosted Clay personalisation column with rules: it is designed for large outreach lists where calling an LLM once per prospect would be slow, hard to audit, and easy to get wrong.
 
-Claude or Codex can help configure a campaign once. The bulk runner then processes every row using fixed rules:
+The Skill runs the setup as a conversation: it asks about the offer, proof, risk reversal, and call to action, reads a sample of the companies, proposes the target market in plain English, and writes the campaign file. The bulk runner then processes every row:
 
-- fetch each unique public company domain once;
-- reuse cached pages and extracted signals across duplicate domains;
-- map website evidence to campaign-approved commercial categories;
+- fetch each unique public company domain once and cache it;
+- ask the model once per company, several companies per call, whether it fits the target, which sentence proves it, and what a personalised opening should say;
+- verify the quoted evidence is really on the page and run the opening through the copy gates;
 - qualify the company, contact, and supplied email;
-- assemble copy from approved subject, pitch, offer, and CTA variants;
-- run deterministic quality and repetition checks;
+- assemble the email from the opening plus approved offer-line, CTA, and subject variants;
+- run batch-level quality and repetition checks;
 - write separate audit, ready, and review files.
 
 > [!IMPORTANT]
-> The CLI does not ask an AI model to write each email. It also does not discover emails, verify addresses with external providers, upload leads, or send campaigns.
+> The model classifies each company and writes its opening line only; the commercial claims, offer line, CTA, and subject always come from approved variants. The CLI never discovers emails, verifies addresses with external providers, uploads leads, or sends campaigns.
 
 ## At a glance
 
 | Capability | Behaviour |
 | --- | --- |
-| Bulk method | One deterministic pass across the CSV |
+| Bulk method | One pass across the CSV, one cached model decision per unique company |
+| Model access | Your Claude Code or Codex CLI login by default; Anthropic API optional |
 | Website access | Parallel requests to public company pages |
 | Difficult websites | Optional Firecrawl fallback |
 | Duplicate domains | Fetched once and reused |
 | Cache | Persistent HTTP, Firecrawl, and extracted-signal caches |
 | Campaign logic | Offer and niche rules live in JSON and CSV configuration |
-| Personalisation | Website evidence first, approved CSV or title fallback when configured |
+| Personalisation | A model-written opening specific to each company, verified against its website; approved templates as fallback |
+| Company classification | Plain-English target and exclusions judged by the model; regex focus rules as fallback |
+| Usage guards | Premium models refused unless opted in; per-run nominal budget; usage estimate before every run |
 | Quality control | Word limits, banned phrases, source-overlap checks, and batch repetition gates |
 | Final statuses | `ready`, `review`, `excluded`, or `error` |
 | Delivery | Smartlead/ListKit-compatible CSVs plus a complete audit trail |
@@ -113,9 +116,9 @@ flowchart TD
 
 ## Core design principles
 
-### Deterministic
+### Deterministic where it counts
 
-The same input, campaign, focus rules, title hooks, and cache produce the same CSV output. Template, offer-line, and CTA selection use stable company identities rather than randomness.
+Model decisions are made once per company and cached, so the same input, campaign, and cache produce the same CSV output on every re-run. Template, offer-line, and CTA selection use stable company identities rather than randomness, and every gate that decides whether a row is ready is plain code.
 
 ### Offer-agnostic
 
@@ -127,7 +130,7 @@ Every row records the selected evidence, its source, the matching rule, the temp
 
 ### Conservative by default
 
-Strict campaigns fail closed when evidence is weak or off-target. A broader title-persona route is available, but it must be deliberately enabled in the campaign.
+Strict campaigns fail closed when evidence is weak or off-target. A model answer without a verbatim quote from the page is rejected, and a pitch that breaks a copy rule is dropped in favour of an approved template. A broader title-persona route is available, but it must be deliberately enabled in the campaign.
 
 ## Requirements
 
@@ -136,6 +139,7 @@ Strict campaigns fail closed when evidence is weak or off-target. A broader titl
 - Public company domains for website-based personalisation
 - Optional Firecrawl access for JavaScript-heavy or difficult websites
 - No Python runtime dependencies beyond the standard library
+- A signed-in Claude Code or Codex CLI when a campaign enables model classification; the `llm` extra plus an Anthropic API key is only needed for the optional `api` provider
 
 ## Quick start
 
@@ -188,10 +192,10 @@ Both products use the same tracked Skill source, so their instructions cannot dr
 Example prompt:
 
 ```text
-Use $bulk-outreach-personalizer to configure and test this outreach CSV for my offer.
+Use $bulk-outreach-personalizer to personalise leads.csv for my offer.
 ```
 
-For a new campaign, the Skill should inspect a representative sample, propose qualification and copy rules, request approval, and only then freeze the configuration. The full-list CLI still makes no per-row AI calls.
+The Skill interviews you about the offer, proof, risk reversal, and call to action, reads a sample of the companies, proposes the target market and exclusions, writes the campaign file, runs a sample, and reads finished emails back before asking for approval. The full-list run still makes one cached model decision per company, never one per row.
 
 ## Input CSV
 
@@ -210,6 +214,8 @@ Header aliases are matched case-insensitively and tolerate spaces or underscores
 | Company intelligence | Description, keywords, products, industry, service tags | Optional campaign-approved fallback evidence |
 
 A domain or website column is not mandatory for a deliberately broad title-fallback campaign. When no usable website exists, the engine uses a hashed company-name identity for deterministic copy variation, QA, and contact sequencing. It never presents that identity as website evidence.
+
+For company qualification without contacts or copy, pass `--company-qualification-only`. In that mode the CSV needs only a company domain or website column; company name and LinkedIn URL columns are optional and preserved. Email, first name, job title, and email status are neither required nor evaluated.
 
 ## Campaign setup
 
@@ -361,6 +367,22 @@ New campaigns must remain:
 Change the status to `approved` only after reviewing qualification decisions, fallback behaviour, and complete emails from a representative test.
 
 ## Running a list
+
+### Company qualification only
+
+Use this mode to decide which accounts belong in the target market before contact enrichment:
+
+```bash
+python scripts/enrich.py \
+  --input /absolute/path/companies.csv \
+  --output outputs/client-campaign/company-qualification-audit.csv \
+  --ready-output outputs/client-campaign/company-fit.csv \
+  --review-output outputs/client-campaign/company-needs-review.csv \
+  --campaign campaigns/local/client-campaign.json \
+  --company-qualification-only
+```
+
+The audit contains every company. `--ready-output` contains only `fit` companies and `--review-output` contains only `needs_review` companies. `not_fit` companies remain in the audit. This path never evaluates contacts or email addresses, sequences contacts, or renders outreach copy. A campaign marked `test_only` still requires `--allow-test-campaign` for a controlled run.
 
 ### Step 1. Validate without fetching websites
 
@@ -552,6 +574,66 @@ python scripts/enrich.py \
 
 Never place API keys in campaign JSON, CSV files, command arguments, tracked files, or chat. Shell variables take precedence over `.env` values.
 
+## Setting up a campaign by conversation
+
+The Skill drives setup as an interview: hand Claude Code or Codex the CSV, answer questions about the offer, proof, risk reversal, and call to action, and let it read a sample of the companies before it proposes the target market. `--digest-only` supports that step by fetching each company's pages and writing their text into `company_page_digest` with no campaign and no model:
+
+```bash
+python scripts/enrich.py --input /absolute/path/leads.csv --output outputs/client/digests.csv --digest-only
+```
+
+The script for the conversation is in `skill/bulk-outreach-personalizer/references/interview.md`.
+
+## Optional model classification
+
+Regex focus rules cannot read intent. On broad lists most readable websites match no rule and fall to title fallback, and a rebranded domain or a stale CSV segment can produce a confident but wrong pitch. `personalization.llm_focus` replaces only that one decision with a model call, made once per unique company domain and never per row.
+
+No API key is required. The default provider is the locally installed Claude Code CLI in headless mode, which runs on your own Claude subscription login. Each call packs several domains into one prompt, disables every tool, MCP server, hook, and project file, and runs in an empty directory, so a call carries only the campaign brief and the page text. Measured on a real five-domain call this is about 9,000 tokens, against 300,000 when Claude Code loads a normal session. Usage counts toward your plan limits, not an API bill. A `codex` provider runs the same prompt through the OpenAI Codex CLI with a ChatGPT login, and an `api` provider uses the Anthropic SDK for teams that prefer keys and the Message Batches API.
+
+```json
+"llm_focus": {
+  "enabled": true,
+  "provider": "claude-code",
+  "domains_per_call": 5,
+  "icp": "B2B service companies whose customers are other businesses.",
+  "exclusions": "Law firms, private equity, trade associations.",
+  "model": "claude-opus-5",
+  "effort": "low",
+  "examples": [
+    {"site": "Midwest executive search in accounting and finance", "fit_tier": "core", "focus": "executive search", "buyer_phrase": "companies hiring senior finance leaders"}
+  ]
+}
+```
+
+What the model sees is the campaign offer and its approved claims, the plain-English target and exclusion descriptions, your examples, the strongest contact's job title, and the title, description, headings, and paragraphs fetched from the company's public pages. When a domain redirects to another company domain, the model also sees the redirected page with a note to decide whether it is the same company under a new name or a parked domain. It must answer with a fixed JSON schema: `fit_tier`, `signal_type`, `focus`, `buyer_phrase`, a verbatim `evidence` quote, a personalised `pitch`, a one-line `reason`, and a `confidence`.
+
+**The pitch is the personalisation.** With `write_pitch` on, the model writes one or two sentences for each fitting company that name something specific from its site and tie it to the offer, addressed to the reader and shaped by the contact's title. That pitch becomes the opening of the email; the approved offer line, call to action, and subject follow it unchanged. A pitch that runs long, opens with a research announcement, copies too many consecutive words from the site, names the company, states a figure, or uses a banned phrase is dropped, the row falls back to the approved pitch templates, and `personalization_error` records why.
+
+The engine then treats the answer as untrusted:
+
+- the evidence quote must appear verbatim in the fetched text, otherwise the decision is rejected;
+- `focus` and `buyer_phrase` pass the same word-limit, stacking, promotional-language, banned-phrase, and company-name checks as regex rules;
+- a rejected or failed decision falls back to the regex focus rules for that domain;
+- `confidence` feeds the existing `min_confidence` review gate, `exclude` decisions are explicit exclusions, and every later contact, email, copy, batch-quality, and sequencing gate still applies.
+
+Decisions are cached under `var/cache/llm-focus` by domain, provider, model, effort, and a digest of the brief, so re-runs, duplicate contacts, and other campaigns with the same brief cost nothing. Editing the ICP, exclusions, or examples changes the digest and re-classifies. The audit records `company_fit_rule=llm-focus`, the quote as evidence, and the model's reason inside `company_fit_reason`; the manifest's `llm_focus` object reports the provider, CLI calls, requests, cache hits, rejections, errors, and token totals.
+
+`--validate-only` reports `provider_ready` and a plain-English blocker when the CLI is missing, plus `estimated_nominal_usd_for_list` so you know what a run will consume before it starts. The run itself stops before fetching anything if the CLI is absent or not signed in. Campaign files never carry keys or tokens.
+
+Two guards protect your subscription. Fable and Mythos tier models are refused unless the campaign sets `allow_expensive_models` to true. Each run stops submitting new calls once its nominal usage reaches `max_nominal_usd` (default 20); the remaining companies are left uncached and the next run picks them up. The manifest records `nominal_cost_usd` for every run.
+
+```bash
+python scripts/enrich.py \
+  --input /absolute/path/leads.csv \
+  --output outputs/client-campaign/audit.csv \
+  --ready-output outputs/client-campaign/smartlead-ready.csv \
+  --review-output outputs/client-campaign/review.csv \
+  --campaign campaigns/local/client-campaign.json \
+  --llm-concurrency 2
+```
+
+Two calls run at a time by default; raise `--llm-concurrency` only if your plan limits allow. With the `api` provider, `--llm-mode batch` submits uncached domains to the Message Batches API and `--llm-batch-id` collects an interrupted batch.
+
 ## Copy-quality controls
 
 The engine can reject or review copy for:
@@ -584,6 +666,14 @@ Common options:
 | --- | --- |
 | `--ready-output` | Write upload-safe rows |
 | `--review-output` | Write manual-review rows |
+| `--company-qualification-only` | Qualify company domains only; skip contacts, email gates, sequencing, and copy |
+| `--digest-only` | Fetch pages and write text digests with no campaign and no model |
+| `--llm-budget-usd` | Override the campaign's per-run nominal usage budget |
+| `--llm-concurrency` | Simultaneous model calls for campaign `llm_focus`; default `2` |
+| `--llm-cache-ttl-hours` | Lifetime of cached model decisions; default `720` |
+| `--llm-mode` | `sync` or `batch`; `batch` is only valid with provider `api` |
+| `--llm-poll-seconds` | Batch status polling interval for provider `api`; default `30` |
+| `--llm-batch-id` | Reuse an already submitted `api` batch instead of resubmitting |
 | `--validate-only` | Validate without fetching or writing CSV output |
 | `--allow-test-campaign` | Permit a controlled run while status is `test_only` |
 | `--concurrency` | Parallel direct-domain workers; default `24` |
@@ -653,7 +743,9 @@ git diff --check
 - Private, loopback, link-local, and reserved network targets are blocked
 - Response sizes, redirects, timeouts, content types, and retry counts are bounded
 - No email-discovery or verification waterfall
-- No per-row AI generation
+- No per-row AI generation; one cached, gated model decision per company
+- No API keys required or stored; model calls run through your own CLI login
+- Premium model tiers refused unless the campaign opts in; every run has a nominal usage budget
 - No automatic Smartlead/ListKit upload
 - No automatic campaign sending
 - No client claims without approval

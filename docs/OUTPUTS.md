@@ -2,13 +2,38 @@
 
 The CLI preserves every input column and row order, then appends the campaign's configured output fields.
 
+## Digest-only output
+
+With `--digest-only` and no campaign, the CLI appends `company_enrichment_status`, `company_enrichment_error`, `company_page_source`, and `company_page_digest` (up to 1,500 characters of fetched title, description, headings, and paragraphs). Use it to read a sample of a list before writing the target description.
+
+## Company-qualification-only output
+
+With `--company-qualification-only`, the CLI appends only company evidence and decisions. It does not append or calculate contact, email, sequencing, personalisation, or outreach fields.
+
+| Field | Purpose |
+| --- | --- |
+| `company_qualification_status` | User-facing decision: `fit`, `needs_review`, or `not_fit` |
+| `company_fit_status` | Engine decision: `qualified`, `review`, or `excluded` |
+| `company_fit_tier` | Selected `core`, `secondary`, `exclude`, or `none` tier |
+| `company_fit_rule` | Campaign focus rule responsible for the decision, or `llm-focus` for a model decision |
+| `company_fit_source` | First-party URL or approved `input:<header>` evidence source |
+| `company_fit_evidence` | Evidence used for company qualification |
+| `company_fit_confidence` | Deterministic evidence score from `0.00` to `1.00` |
+| `company_fit_reason` | Deterministic explanation of the decision |
+| `company_enrichment_status` | Website extraction result, or `missing_domain` |
+| `company_enrichment_error` | Technical website error, when present |
+
+In this mode, `--ready-output` contains `fit` rows and `--review-output` contains `needs_review` rows. `not_fit` rows remain in the complete audit. Website failures and missing domain values are routed to `needs_review`; a readable site that is explicitly excluded or does not match the approved focus rules is `not_fit`.
+
+## Full outreach-personalisation output
+
 | Field | Purpose |
 | --- | --- |
 | `personalized_subject` | Rendered subject line |
 | `personalized_pitch` | Short company-specific offer bridge |
 | `personalized_email` | Complete Smartlead/ListKit-ready email |
 | `personalization_angle` | Signal-routed campaign angle ID |
-| `personalization_template` | Exact approved template ID used |
+| `personalization_template` | Exact approved template ID used, or `llm-pitch` when the model wrote the opening |
 | `personalization_signal_type` | `product`, `service`, `audience`, `specialism`, `positioning`, or broad-campaign `title` fallback |
 | `personalization_source_focus` | Original normalized website phrase retained for audit |
 | `personalization_focus` | One compressed commercial category safe for copy |
@@ -30,7 +55,7 @@ The CLI preserves every input column and row order, then appends the campaign's 
 | `company_fit_rule` | Campaign rule responsible for the company decision |
 | `company_fit_source` | First-party URL or approved `input:<header>` evidence source |
 | `company_fit_evidence` | Evidence used for company qualification |
-| `company_fit_reason` | Deterministic explanation of the company decision |
+| `company_fit_reason` | Deterministic explanation of the company decision; with `llm_focus` enabled it also carries the model's one-line reason, or why its answer was rejected |
 | `contact_fit_status` | Contact-title and seniority decision |
 | `contact_fit_rule` | Matching title/seniority rule |
 | `contact_fit_reason` | Deterministic explanation of the contact decision |
@@ -73,6 +98,7 @@ Every output receives a JSON manifest containing:
 - copy-quality evaluation, warning counts, and flagged-row counts;
 - opening, exact-pitch, buyer-phrase, offer-line, and CTA concentration warnings, each reporting `count` (all affected domains) and `flagged` (the deterministic over-cap overflow demoted to review);
 - a `focus_gaps` object with separate unmatched and intentionally excluded domain counts, plus up to 25 evidence samples for each group;
+- an `llm_focus` object: `enabled`, and when enabled the provider, model, effort, domains per call, CLI call count, prompt version, brief digest, batch IDs, requested/sent/cache-hit counts, ok/rejected/error counts, pitches written and rejected, input, output, and cache-read token totals, `nominal_cost_usd`, `budget_usd`, and `budget_exhausted`;
 - the exact non-secret run settings.
 - immutable copies and hashes of the campaign JSON and focus CSV used for the run.
 

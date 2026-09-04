@@ -20,6 +20,7 @@ from bulk_enrich.models import CompanyFact, FetchResult, SiteSignal
 
 
 SIGNAL_ENGINE_VERSION = "9"
+PAGE_DIGEST_MAX_CHARS = 6000
 
 
 _GENERIC_BRAND_SUFFIXES = (
@@ -62,6 +63,24 @@ def _redirect_matches_domain(domain: str, final_url: str) -> bool:
         min(len(expected_brand), len(actual_brand)) >= 5
         and (expected_brand in actual_brand or actual_brand in expected_brand)
     )
+
+
+def page_digest(pages: list[tuple[FetchResult, object]], limit: int = PAGE_DIGEST_MAX_CHARS) -> str:
+    """Compact, source-labelled page text kept for optional model classification."""
+    parts: list[str] = []
+    for result, page in pages:
+        parts.append(f"[{result.final_url or result.url}]")
+        title = getattr(page, "title", "")
+        if title:
+            parts.append(f"Title: {title}")
+        description = getattr(page, "meta_description", "")
+        if description:
+            parts.append(f"Description: {description}")
+        for heading in tuple(getattr(page, "headings", ()))[:12]:
+            parts.append(f"Heading: {heading}")
+        parts.extend(tuple(getattr(page, "paragraphs", ())))
+    digest = "\n".join(part for part in parts if part)
+    return digest[:limit]
 
 
 class PageFetcher(Protocol):
@@ -118,6 +137,8 @@ class SiteEnricher:
             )
         if not _redirect_matches_domain(domain, home.final_url or home.url):
             redirected_host = urlsplit(home.final_url or home.url).hostname or "unknown"
+            # Keep the redirected page text so an optional model classifier can
+            # judge a rebrand; the deterministic path still treats it as unavailable.
             return SiteSignal(
                 domain=domain,
                 observation="",
@@ -128,6 +149,7 @@ class SiteEnricher:
                 error=f"homepage redirected to a different company domain: {redirected_host}",
                 pages_fetched=1,
                 http_cache_hits=int(home.from_cache),
+                page_digest=page_digest([(home, parse_html(home.body))]),
             )
 
         pages: list[tuple[FetchResult, object]] = []
@@ -164,6 +186,7 @@ class SiteEnricher:
                 error="no usable company description found on fetched pages",
                 pages_fetched=len(pages),
                 http_cache_hits=sum(int(result.from_cache) for result, _page in pages),
+                page_digest=page_digest(pages),
             )
 
         facts: list[CompanyFact] = []
@@ -215,6 +238,7 @@ class SiteEnricher:
             facts=tuple(facts),
             pages_fetched=len(pages),
             http_cache_hits=sum(int(result.from_cache) for result, _page in pages),
+            page_digest=page_digest(pages),
         )
 
     def _fetch_homepage(self, domain: str) -> FetchResult:

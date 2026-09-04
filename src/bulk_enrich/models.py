@@ -84,6 +84,7 @@ class SiteSignal:
     pages_fetched: int = 0
     http_cache_hits: int = 0
     signal_cache_hit: bool = False
+    page_digest: str = ""
 
     def cached_copy(self) -> "SiteSignal":
         return replace(
@@ -118,4 +119,5 @@ class SiteSignal:
             pages_fetched=int(data.get("pages_fetched", 0)),
             http_cache_hits=int(data.get("http_cache_hits", 0)),
             signal_cache_hit=bool(data.get("signal_cache_hit", False)),
+            page_digest=str(data.get("page_digest", "")),
         )

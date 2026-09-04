@@ -16,11 +16,30 @@ from bulk_enrich.csv_io import inspect_csv
 from bulk_enrich.focus import CommercialFocusError, CommercialFocusTable
 from bulk_enrich.firecrawl import DEFAULT_FIRECRAWL_API_URL, FirecrawlSettings
 from bulk_enrich.hooks import TitleHookTable
-from bulk_enrich.pipeline import RunOptions, run_enrichment
+from bulk_enrich.llm_focus import (
+    LlmFocusError,
+    estimate_nominal_usd,
+    provider_ready,
+    supports_effort,
+)
+from bulk_enrich.pipeline import (
+    RunOptions,
+    run_company_qualification,
+    run_digests,
+    run_enrichment,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-LOCAL_ENV_KEYS = frozenset({"FIRECRAWL_API_URL", "FIRECRAWL_API_KEY"})
+LOCAL_ENV_KEYS = frozenset(
+    {
+        "FIRECRAWL_API_URL",
+        "FIRECRAWL_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_PROFILE",
+    }
+)
 
 
 def _load_local_env(path: Path = REPOSITORY_ROOT / ".env") -> None:
@@ -67,7 +86,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--input", required=True, help="Source lead CSV")
     parser.add_argument("--output", required=True, help="Destination enriched CSV")
-    parser.add_argument("--campaign", required=True, help="Campaign JSON configuration")
+    parser.add_argument(
+        "--campaign",
+        help="Campaign JSON configuration (required except with --digest-only)",
+    )
     parser.add_argument(
         "--title-hooks",
         default=str(REPOSITORY_ROOT / "config" / "title-hooks.csv"),
@@ -96,6 +118,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--review-output",
         help="Optional second CSV containing only rows requiring manual review",
+    )
+    parser.add_argument(
+        "--digest-only",
+        action="store_true",
+        help=(
+            "Fetch each company's public pages and write their text digests with no "
+            "campaign and no model, for looking at a list before defining the target"
+        ),
+    )
+    parser.add_argument(
+        "--company-qualification-only",
+        action="store_true",
+        help=(
+            "Qualify company domains from public website evidence and skip contact, "
+            "email, sequencing, and outreach-copy processing"
+        ),
     )
     parser.add_argument(
         "--concurrency",
@@ -172,6 +210,45 @@ def build_parser() -> argparse.ArgumentParser:
         help="Delete cache entries older than --cache-ttl-hours before running",
     )
     parser.add_argument(
+        "--llm-mode",
+        choices=("sync", "batch"),
+        default="sync",
+        help=(
+            "How campaign llm_focus calls run; batch uses the Message Batches API and "
+            "is only valid with provider 'api' (default: sync)"
+        ),
+    )
+    parser.add_argument(
+        "--llm-concurrency",
+        type=_positive_int,
+        default=2,
+        help="Simultaneous model calls, CLI or API (default: 2)",
+    )
+    parser.add_argument(
+        "--llm-poll-seconds",
+        type=_positive_float,
+        default=30.0,
+        help="Seconds between batch status checks in batch mode (default: 30)",
+    )
+    parser.add_argument(
+        "--llm-cache-ttl-hours",
+        type=_positive_float,
+        default=720.0,
+        help="Lifetime of cached model decisions per domain (default: 720)",
+    )
+    parser.add_argument(
+        "--llm-budget-usd",
+        type=_positive_float,
+        help="Override the campaign's per-run nominal usage budget for model calls",
+    )
+    parser.add_argument(
+        "--llm-batch-id",
+        action="append",
+        default=[],
+        metavar="ID",
+        help="Reuse the results of an already submitted batch (repeatable)",
+    )
+    parser.add_argument(
         "--allow-test-campaign",
         action="store_true",
         help="Allow a production output using a campaign marked test_only",
@@ -194,12 +271,16 @@ def _validation_payload(
     focus_rules_path: str | None,
     *,
     allow_test_campaign: bool,
+    company_qualification_only: bool = False,
     firecrawl_fallback: bool = False,
     firecrawl_api_url: str = DEFAULT_FIRECRAWL_API_URL,
 ) -> dict[str, object]:
     campaign = load_campaign(campaign_path)
-    csv_summary = inspect_csv(input_path)
-    hooks = TitleHookTable.load(title_hooks_path)
+    csv_summary = inspect_csv(
+        input_path,
+        company_only=company_qualification_only,
+    )
+    hooks = None if company_qualification_only else TitleHookTable.load(title_hooks_path)
     configured_focus_path = (
         Path(focus_rules_path).expanduser().resolve()
         if focus_rules_path
@@ -213,12 +294,38 @@ def _validation_payload(
         ).validate()
     execution_ready = campaign.status == "approved" or allow_test_campaign
     template_count = sum(len(angle.templates) for angle in campaign.angles)
+    llm_settings = campaign.llm_focus
+    llm_payload: dict[str, object] = {"enabled": False}
+    if llm_settings is not None:
+        ready, blocker = provider_ready(llm_settings, dict(os.environ))
+        llm_payload = {
+            "enabled": True,
+            "provider": llm_settings.provider,
+            "model": llm_settings.model,
+            "effort": llm_settings.effort if supports_effort(llm_settings.model) else None,
+            "domains_per_call": llm_settings.domains_per_call,
+            "write_pitch": llm_settings.write_pitch,
+            "max_pitch_words": llm_settings.max_pitch_words,
+            "examples": len(llm_settings.examples),
+            "max_evidence_chars": llm_settings.max_evidence_chars,
+            "estimated_nominal_usd_for_list": estimate_nominal_usd(
+                llm_settings.model, csv_summary.unique_domain_count
+            ),
+            "budget_usd_per_run": llm_settings.max_nominal_usd,
+            "provider_ready": ready,
+            "provider_blocker": blocker,
+        }
     return {
         "status": "validated",
+        "mode": (
+            "company_qualification_only"
+            if company_qualification_only
+            else "outreach_personalization"
+        ),
         "campaign_id": campaign.campaign_id,
         "campaign_status": campaign.status,
         "input": csv_summary.to_dict(),
-        "title_hook_rules": len(hooks.rules),
+        "title_hook_rules": len(hooks.rules) if hooks is not None else 0,
         "commercial_focus_rules": len(focuses.rules),
         "commercial_focus_path": str(focuses.path),
         "qualification": {
@@ -227,23 +334,34 @@ def _validation_payload(
             ),
             "fallback_min_agreeing_fields": campaign.fallback_min_agreeing_fields,
             "fallback_fields": list(campaign.fallback_qualification_fields),
-            "priority_title_patterns": len(campaign.contact_priority_patterns),
-            "ready_title_patterns": len(campaign.ready_title_patterns),
-            "review_title_patterns": len(campaign.review_title_patterns),
-            "exclude_title_patterns": len(campaign.excluded_title_patterns),
-            "missing_email_status_action": campaign.missing_email_status_action,
+            "contact_and_email_gates_skipped": company_qualification_only,
+            **(
+                {}
+                if company_qualification_only
+                else {
+                    "priority_title_patterns": len(campaign.contact_priority_patterns),
+                    "ready_title_patterns": len(campaign.ready_title_patterns),
+                    "review_title_patterns": len(campaign.review_title_patterns),
+                    "exclude_title_patterns": len(campaign.excluded_title_patterns),
+                    "missing_email_status_action": campaign.missing_email_status_action,
+                }
+            ),
         },
-        "copy_angles": len(campaign.angles),
-        "copy_templates": template_count,
-        "offer_line_variants": len(campaign.offer_line_variants),
-        "cta_variants": len(campaign.cta_variants),
-        "banned_phrases": len(campaign.banned_phrases),
-        "quality_gate": campaign.data["quality"],
+        "copy_skipped": company_qualification_only,
+        "copy_angles": 0 if company_qualification_only else len(campaign.angles),
+        "copy_templates": 0 if company_qualification_only else template_count,
+        "offer_line_variants": (
+            0 if company_qualification_only else len(campaign.offer_line_variants)
+        ),
+        "cta_variants": 0 if company_qualification_only else len(campaign.cta_variants),
+        "banned_phrases": 0 if company_qualification_only else len(campaign.banned_phrases),
+        "quality_gate": None if company_qualification_only else campaign.data["quality"],
         "firecrawl": {
             "enabled": firecrawl_fallback,
             "api_url": firecrawl_api_url if firecrawl_fallback else "",
             "api_key_configured": bool(os.environ.get("FIRECRAWL_API_KEY", "").strip()),
         },
+        "llm_focus": llm_payload,
         "requested_output": str(Path(output_path).expanduser().resolve()),
         "execution_ready": execution_ready,
         "execution_blocker": (
@@ -269,6 +387,37 @@ def main(argv: list[str] | None = None) -> int:
                 Path(args.cache_dir).expanduser().resolve()
             ).prune(ttl_hours=args.cache_ttl_hours)
             print(f"pruned {removed} expired cache entries", file=sys.stderr)
+        if args.digest_only:
+            manifest = run_digests(
+                input_path=args.input,
+                output_path=args.output,
+                options=RunOptions(
+                    cache_dir=Path(args.cache_dir).expanduser().resolve(),
+                    concurrency=args.concurrency,
+                    timeout=args.timeout,
+                    retries=args.retries,
+                    max_pages=args.max_pages,
+                    max_response_bytes=args.max_response_bytes,
+                    cache_ttl_hours=args.cache_ttl_hours,
+                    refresh_cache=args.refresh_cache,
+                    manifest_path=(
+                        Path(args.manifest).expanduser().resolve() if args.manifest else None
+                    ),
+                ),
+                progress=None if args.quiet else (
+                    lambda completed, total, domain, status: print(
+                        f"domains {completed}/{total}: {domain} [{status}]",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    if completed == 1 or completed == total or completed % 25 == 0
+                    else None
+                ),
+            )
+            print(json.dumps(manifest, indent=2, sort_keys=True))
+            return 0
+        if not args.campaign:
+            raise ValueError("--campaign is required unless --digest-only is used")
         campaign = load_campaign(args.campaign)
         if args.validate_only:
             payload = _validation_payload(
@@ -278,6 +427,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.title_hooks,
                 args.focus_rules,
                 allow_test_campaign=args.allow_test_campaign,
+                company_qualification_only=args.company_qualification_only,
                 firecrawl_fallback=args.firecrawl_fallback,
                 firecrawl_api_url=args.firecrawl_api_url,
             )
@@ -287,7 +437,6 @@ def main(argv: list[str] | None = None) -> int:
                     "campaign is marked test_only; change status to approved after review "
                     "or pass --allow-test-campaign for a controlled test"
                 )
-            hooks = TitleHookTable.load(args.title_hooks)
             focus_rules_path = (
                 Path(args.focus_rules).expanduser().resolve()
                 if args.focus_rules
@@ -305,48 +454,82 @@ def main(argv: list[str] | None = None) -> int:
                         flush=True,
                     )
 
-            manifest = run_enrichment(
-                input_path=args.input,
-                output_path=args.output,
-                campaign=campaign,
-                title_hooks=hooks,
-                commercial_focuses=focuses,
-                options=RunOptions(
-                    cache_dir=Path(args.cache_dir).expanduser().resolve(),
-                    concurrency=args.concurrency,
-                    timeout=args.timeout,
-                    retries=args.retries,
-                    max_pages=args.max_pages,
-                    max_response_bytes=args.max_response_bytes,
-                    cache_ttl_hours=args.cache_ttl_hours,
-                    refresh_cache=args.refresh_cache,
-                    firecrawl_fallback=args.firecrawl_fallback,
-                    firecrawl_api_url=args.firecrawl_api_url,
-                    firecrawl_timeout=args.firecrawl_timeout,
-                    firecrawl_concurrency=args.firecrawl_concurrency,
-                    manifest_path=(
-                        Path(args.manifest).expanduser().resolve() if args.manifest else None
-                    ),
-                    ready_output_path=(
-                        Path(args.ready_output).expanduser().resolve()
-                        if args.ready_output
-                        else None
-                    ),
-                    review_output_path=(
-                        Path(args.review_output).expanduser().resolve()
-                        if args.review_output
-                        else None
-                    ),
+            def log(message: str) -> None:
+                if not args.quiet:
+                    print(message, file=sys.stderr, flush=True)
+
+            if campaign.llm_focus is not None:
+                ready, blocker = provider_ready(campaign.llm_focus, dict(os.environ))
+                if not ready:
+                    raise LlmFocusError(
+                        "campaign enables personalization.llm_focus but its provider "
+                        f"'{campaign.llm_focus.provider}' cannot run: {blocker}"
+                    )
+
+            options = RunOptions(
+                cache_dir=Path(args.cache_dir).expanduser().resolve(),
+                concurrency=args.concurrency,
+                timeout=args.timeout,
+                retries=args.retries,
+                max_pages=args.max_pages,
+                max_response_bytes=args.max_response_bytes,
+                cache_ttl_hours=args.cache_ttl_hours,
+                refresh_cache=args.refresh_cache,
+                firecrawl_fallback=args.firecrawl_fallback,
+                firecrawl_api_url=args.firecrawl_api_url,
+                firecrawl_timeout=args.firecrawl_timeout,
+                firecrawl_concurrency=args.firecrawl_concurrency,
+                manifest_path=(
+                    Path(args.manifest).expanduser().resolve() if args.manifest else None
                 ),
-                progress=progress,
+                ready_output_path=(
+                    Path(args.ready_output).expanduser().resolve()
+                    if args.ready_output
+                    else None
+                ),
+                review_output_path=(
+                    Path(args.review_output).expanduser().resolve()
+                    if args.review_output
+                    else None
+                ),
+                llm_mode=args.llm_mode,
+                llm_concurrency=args.llm_concurrency,
+                llm_poll_seconds=args.llm_poll_seconds,
+                llm_cache_ttl_hours=args.llm_cache_ttl_hours,
+                llm_batch_ids=tuple(args.llm_batch_id),
+                llm_budget_usd=args.llm_budget_usd,
             )
+            if args.company_qualification_only:
+                manifest = run_company_qualification(
+                    input_path=args.input,
+                    output_path=args.output,
+                    campaign=campaign,
+                    commercial_focuses=focuses,
+                    options=options,
+                    progress=progress,
+                    log=log,
+                )
+            else:
+                hooks = TitleHookTable.load(args.title_hooks)
+                manifest = run_enrichment(
+                    input_path=args.input,
+                    output_path=args.output,
+                    campaign=campaign,
+                    title_hooks=hooks,
+                    commercial_focuses=focuses,
+                    options=options,
+                    progress=progress,
+                    log=log,
+                )
             payload = {
                 "status": "completed",
+                "mode": manifest["mode"],
                 "campaign_id": campaign.campaign_id,
                 "output": manifest["output"],
                 "domains": manifest["domains"],
                 "http": manifest["http"],
                 "firecrawl": manifest["firecrawl"],
+                "llm_focus": manifest["llm_focus"],
                 "qualification": manifest["qualification"],
                 "duration_seconds": manifest["run"]["duration_seconds"],
             }

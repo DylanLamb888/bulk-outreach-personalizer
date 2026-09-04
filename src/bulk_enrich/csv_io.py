@@ -92,7 +92,7 @@ class CSVData:
     column_map: dict[str, str]
 
 
-def load_csv(path: str | Path) -> CSVData:
+def load_csv(path: str | Path, *, company_only: bool = False) -> CSVData:
     csv_path = Path(path).expanduser().resolve()
     if not csv_path.is_file():
         raise FileNotFoundError(f"input CSV not found: {csv_path}")
@@ -108,10 +108,16 @@ def load_csv(path: str | Path) -> CSVData:
         ]
 
     mapping = detect_columns(headers)
-    required = ("email", "first_name", "company_name")
+    required = () if company_only else ("email", "first_name", "company_name")
     missing_headers = [field for field in required if field not in mapping]
     if missing_headers:
         raise ValueError("input CSV is missing required columns: " + ", ".join(missing_headers))
+    if company_only and not any(
+        field in mapping for field in ("company_domain", "company_website")
+    ):
+        raise ValueError(
+            "company qualification input is missing a company domain or website column"
+        )
 
     return CSVData(path=csv_path, headers=headers, rows=rows, column_map=mapping)
 
@@ -126,11 +132,11 @@ def summarize_csv(data: CSVData) -> CSVSummary:
     }
     domains = [domain_for_row(row, mapping) for row in rows]
     present_domains = [domain for domain in domains if domain]
-    email_header = mapping["email"]
+    email_header = mapping.get("email", "")
     emails = [
         row.get(email_header, "").strip().casefold()
         for row in rows
-        if row.get(email_header, "").strip()
+        if email_header and row.get(email_header, "").strip()
     ]
     email_status_header = mapping.get("email_status", "")
 
@@ -154,8 +160,8 @@ def summarize_csv(data: CSVData) -> CSVSummary:
     )
 
 
-def inspect_csv(path: str | Path) -> CSVSummary:
-    return summarize_csv(load_csv(path))
+def inspect_csv(path: str | Path, *, company_only: bool = False) -> CSVSummary:
+    return summarize_csv(load_csv(path, company_only=company_only))
 
 
 def context_for_row(row: dict[str, str], mapping: dict[str, str]) -> dict[str, Any]:

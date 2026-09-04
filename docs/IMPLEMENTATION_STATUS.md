@@ -5,6 +5,7 @@
 - Portable Claude Code and Codex Skill layout
 - Safe idempotent installer linking one tracked Skill source into both products
 - Python CLI with validation and production modes
+- Domain/website-only company qualification mode with `fit`, `needs_review`, and `not_fit` outputs and no contact, email, sequencing, or copy processing
 - Offer-agnostic campaign JSON validation
 - Breaking schema-v3 qualification contract with explicit migration errors for v2
 - Common CSV header mapping and row-order preservation
@@ -55,11 +56,18 @@
 - Per-row containment of title-hook gaps and fail-closed empty-subject and blank-company-name handling
 - Opt-in broad-campaign title-persona fallback for unmatched, unavailable, or explicitly permitted company evidence
 - Stable hashed company-name assignment for title fallback when a CSV has no usable website value
+- Opt-in model classification once per unique domain (`personalization.llm_focus`) with JSON-schema output, verbatim-evidence verification, standard phrase gates, regex fallback, per-domain caching, and manifest token accounting
+- Subscription providers: headless Claude Code (default, several domains per call, tools and MCP disabled) and Codex CLI, plus an optional Anthropic SDK provider with sync and Message Batches transports
+- Redirected homepages retained as model evidence so rebrands can be classified instead of discarded
+- Model-written personalised opening pitch per company, title-aware, gated by word limit, opener, company-name, figure, source-overlap, banned-phrase, and dash checks, with template fallback on rejection
+- Premium-model opt-in guard, per-run nominal usage budget, usage estimate at validation, and nominal cost accounting in the manifest
+- `--digest-only` mode and an interview-driven Skill workflow for conversational campaign setup
+- Page digests (title, description, headings, paragraphs) stored with site signals for model classification
 
 ## Deliberate boundaries
 
 - Public websites, approved company intelligence already supplied in the input CSV, and explicit title-persona fallback; no login, CAPTCHA bypass, LinkedIn scraping, or private data access
-- No per-row LLM calls or agent-written personalization
+- No per-row LLM calls or agent-written personalization; the optional model step classifies each unique domain once, never writes copy, and is re-validated deterministically
 - No email discovery or verification waterfall; the engine only evaluates supplied statuses and syntax
 - No automatic campaign sending or Smartlead mutation
 - JavaScript-only websites may produce a weak or missing signal unless the optional Firecrawl fallback is configured

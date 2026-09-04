@@ -234,6 +234,16 @@ def _generic_buyer_phrase(signal_type: str, focus: str, max_words: int) -> str:
     return _shorten(phrase, max_words)
 
 
+def validate_phrase(value: str, label: str, max_words: int) -> str:
+    """Public wrapper so other classifiers reuse the exact phrase gate."""
+    return _validate_phrase(value, label, max_words)
+
+
+def company_name_leak(company_name: str, focus: str) -> bool:
+    """Public wrapper for the company-name leakage check."""
+    return _company_name_leak(company_name, focus)
+
+
 def _validate_phrase(value: str, label: str, max_words: int) -> str:
     cleaned = _clean_spacing(value)
     if not cleaned:

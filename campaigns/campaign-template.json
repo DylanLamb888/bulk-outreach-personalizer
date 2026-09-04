@@ -130,6 +130,34 @@
         }
       ]
     },
+    "llm_focus": {
+      "enabled": false,
+      "provider": "claude-code",
+      "domains_per_call": 5,
+      "write_pitch": true,
+      "max_pitch_words": 30,
+      "max_nominal_usd": 20,
+      "allow_expensive_models": false,
+      "icp": "Describe the target companies in plain English, including what they must sell and to whom.",
+      "exclusions": "List company types that must never be contacted, for example law firms or associations.",
+      "model": "claude-opus-5",
+      "effort": "low",
+      "max_evidence_chars": 3000,
+      "examples": [
+        {
+          "site": "Midwest executive search in accounting, finance and HR",
+          "fit_tier": "core",
+          "focus": "executive search",
+          "buyer_phrase": "companies hiring senior finance leaders"
+        },
+        {
+          "site": "Business attorneys protecting employers",
+          "fit_tier": "exclude",
+          "focus": "employment law",
+          "buyer_phrase": "employers facing workplace disputes"
+        }
+      ]
+    },
     "angles": [
       {
         "id": "verified-signal",
@@ -149,7 +177,7 @@
     "preserve_spintax": true
   },
   "quality": {
-    "max_body_words": 60,
+    "max_body_words": 90,
     "max_subject_words": 8,
     "max_focus_words": 7,
     "max_buyer_phrase_words": 8,

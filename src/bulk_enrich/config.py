@@ -9,6 +9,22 @@ from pathlib import Path
 from typing import Any
 
 
+from bulk_enrich.llm_focus import (
+    DEFAULT_DOMAINS_PER_CALL,
+    DEFAULT_EFFORT,
+    DEFAULT_MAX_NOMINAL_USD,
+    DEFAULT_MAX_PITCH_WORDS,
+    DEFAULT_MODEL,
+    DEFAULT_PROVIDER,
+    EFFORT_LEVELS,
+    FIT_TIERS,
+    MAX_DOMAINS_PER_CALL,
+    PROVIDERS,
+    LlmFocusExample,
+    LlmFocusSettings,
+)
+
+
 class CampaignConfigError(ValueError):
     """Raised when a campaign configuration is incomplete or unsafe to use."""
 
@@ -94,6 +110,37 @@ class CampaignConfig:
     def blocked_evidence_phrases(self) -> tuple[str, ...]:
         configured = self.data["personalization"].get("blocked_evidence_phrases", [])
         return tuple(str(item).casefold() for item in configured)
+
+    @property
+    def llm_focus(self) -> LlmFocusSettings | None:
+        """Opt-in model classification settings, or None when disabled."""
+        configured = self.data["personalization"].get("llm_focus")
+        if not isinstance(configured, dict) or not configured.get("enabled"):
+            return None
+        examples = tuple(
+            LlmFocusExample(
+                site=str(example["site"]).strip(),
+                fit_tier=str(example["fit_tier"]).strip().casefold(),
+                focus=str(example["focus"]).strip(),
+                buyer_phrase=str(example["buyer_phrase"]).strip(),
+            )
+            for example in configured.get("examples", [])
+        )
+        return LlmFocusSettings(
+            enabled=True,
+            icp=str(configured["icp"]).strip(),
+            exclusions=str(configured.get("exclusions", "")).strip(),
+            model=str(configured.get("model", DEFAULT_MODEL)).strip(),
+            effort=str(configured.get("effort", DEFAULT_EFFORT)).strip(),
+            examples=examples,
+            max_evidence_chars=int(configured.get("max_evidence_chars", 3000)),
+            provider=str(configured.get("provider", DEFAULT_PROVIDER)).strip(),
+            domains_per_call=int(configured.get("domains_per_call", DEFAULT_DOMAINS_PER_CALL)),
+            write_pitch=bool(configured.get("write_pitch", True)),
+            max_pitch_words=int(configured.get("max_pitch_words", DEFAULT_MAX_PITCH_WORDS)),
+            max_nominal_usd=float(configured.get("max_nominal_usd", DEFAULT_MAX_NOMINAL_USD)),
+            allow_expensive_models=bool(configured.get("allow_expensive_models", False)),
+        )
 
     @property
     def focus_rules_path(self) -> Path:
@@ -410,6 +457,100 @@ def forbidden_copy_character(value: str) -> str:
     return ""
 
 
+def _validate_llm_focus(configured: Any) -> None:
+    if configured is None:
+        return
+    label = "personalization.llm_focus"
+    if not isinstance(configured, dict):
+        raise CampaignConfigError(f"'{label}' must be a JSON object")
+    allowed = {
+        "enabled",
+        "icp",
+        "exclusions",
+        "provider",
+        "model",
+        "effort",
+        "examples",
+        "max_evidence_chars",
+        "domains_per_call",
+        "write_pitch",
+        "max_pitch_words",
+        "max_nominal_usd",
+        "allow_expensive_models",
+    }
+    unknown = sorted(set(configured).difference(allowed))
+    if unknown:
+        raise CampaignConfigError(f"'{label}' has unknown keys: " + ", ".join(unknown))
+    enabled = configured.get("enabled")
+    if not isinstance(enabled, bool):
+        raise CampaignConfigError(f"'{label}.enabled' must be true or false")
+    if enabled:
+        _require_nonempty_string(configured, "icp", label=f"{label}.icp")
+    elif "icp" in configured and not isinstance(configured["icp"], str):
+        raise CampaignConfigError(f"'{label}.icp' must be a string")
+    if "exclusions" in configured and not isinstance(configured["exclusions"], str):
+        raise CampaignConfigError(f"'{label}.exclusions' must be a string")
+    if "provider" in configured and configured["provider"] not in PROVIDERS:
+        raise CampaignConfigError(
+            f"'{label}.provider' must be one of: " + ", ".join(PROVIDERS)
+        )
+    domains_per_call = configured.get("domains_per_call", DEFAULT_DOMAINS_PER_CALL)
+    if (
+        isinstance(domains_per_call, bool)
+        or not isinstance(domains_per_call, int)
+        or not 1 <= domains_per_call <= MAX_DOMAINS_PER_CALL
+    ):
+        raise CampaignConfigError(
+            f"'{label}.domains_per_call' must be an integer from 1 to {MAX_DOMAINS_PER_CALL}"
+        )
+    for flag in ("write_pitch", "allow_expensive_models"):
+        if flag in configured and not isinstance(configured[flag], bool):
+            raise CampaignConfigError(f"'{label}.{flag}' must be true or false")
+    max_pitch_words = configured.get("max_pitch_words", DEFAULT_MAX_PITCH_WORDS)
+    if (
+        isinstance(max_pitch_words, bool)
+        or not isinstance(max_pitch_words, int)
+        or not 10 <= max_pitch_words <= 60
+    ):
+        raise CampaignConfigError(f"'{label}.max_pitch_words' must be an integer from 10 to 60")
+    max_nominal = configured.get("max_nominal_usd", DEFAULT_MAX_NOMINAL_USD)
+    if (
+        isinstance(max_nominal, bool)
+        or not isinstance(max_nominal, (int, float))
+        or float(max_nominal) <= 0
+    ):
+        raise CampaignConfigError(f"'{label}.max_nominal_usd' must be a number greater than 0")
+    if "model" in configured:
+        _require_nonempty_string(configured, "model", label=f"{label}.model")
+    if "effort" in configured and configured["effort"] not in EFFORT_LEVELS:
+        raise CampaignConfigError(
+            f"'{label}.effort' must be one of: " + ", ".join(EFFORT_LEVELS)
+        )
+    max_chars = configured.get("max_evidence_chars", 3000)
+    if (
+        isinstance(max_chars, bool)
+        or not isinstance(max_chars, int)
+        or not 500 <= max_chars <= 12_000
+    ):
+        raise CampaignConfigError(
+            f"'{label}.max_evidence_chars' must be an integer from 500 to 12000"
+        )
+    examples = configured.get("examples", [])
+    if not isinstance(examples, list) or len(examples) > 12:
+        raise CampaignConfigError(f"'{label}.examples' must be an array of at most 12 items")
+    for index, example in enumerate(examples):
+        example_label = f"{label}.examples[{index}]"
+        if not isinstance(example, dict):
+            raise CampaignConfigError(f"'{example_label}' must be an object")
+        for key in ("site", "focus", "buyer_phrase"):
+            _require_nonempty_string(example, key, label=f"{example_label}.{key}")
+        fit_tier = str(example.get("fit_tier", "")).strip().casefold()
+        if fit_tier not in FIT_TIERS:
+            raise CampaignConfigError(
+                f"'{example_label}.fit_tier' must be core, secondary, or exclude"
+            )
+
+
 def validate_campaign_data(data: dict[str, Any]) -> None:
     if not isinstance(data, dict):
         raise CampaignConfigError("campaign configuration must be a JSON object")
@@ -564,6 +705,8 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
             allow_empty=True,
             label="personalization.blocked_evidence_phrases",
         )
+
+    _validate_llm_focus(personalization.get("llm_focus"))
 
     row_fallback = personalization.get("row_fallback")
     seen_headers: set[str] = set()
@@ -907,6 +1050,22 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         if banned:
             raise CampaignConfigError(
                 f"'{label}' contains banned phrase '{banned}'"
+            )
+
+    llm_focus = personalization.get("llm_focus")
+    if isinstance(llm_focus, dict) and llm_focus.get("enabled") and llm_focus.get("write_pitch", True):
+        pitch_words = int(llm_focus.get("max_pitch_words", DEFAULT_MAX_PITCH_WORDS))
+        needed = (
+            pitch_words
+            + int(quality.get("max_offer_line_words", 24))
+            + int(quality["max_cta_words"])
+            + 8
+        )
+        if int(quality["max_body_words"]) < needed:
+            raise CampaignConfigError(
+                "'quality.max_body_words' must be at least "
+                f"{needed} when llm_focus.write_pitch is enabled with "
+                f"max_pitch_words {pitch_words}; raise it or lower max_pitch_words"
             )
 
     output = _require_mapping(data, "output")

@@ -26,6 +26,7 @@ from bulk_enrich.pipeline import (
     _select_company_candidate,
     _sequence_company_contacts,
     _short_company_name,
+    run_company_qualification,
     run_enrichment,
 )
 from bulk_enrich.qualification import QualificationResult
@@ -232,6 +233,70 @@ class PipelineTests(unittest.TestCase):
             self.assertTrue(
                 Path(manifest["settings"]["commercial_focus_snapshot_path"]).is_file()
             )
+
+    def test_company_qualification_only_skips_contacts_email_and_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            input_path = tmp_path / "companies.csv"
+            input_path.write_text(
+                "company_domain,Company LinkedIn URL\n"
+                "off.example,https://www.linkedin.com/company/off\n"
+                "core.example,https://www.linkedin.com/company/core\n"
+                "secondary.example,https://www.linkedin.com/company/secondary\n",
+                encoding="utf-8",
+            )
+            output = tmp_path / "qualification-audit.csv"
+            fit_output = tmp_path / "fit.csv"
+            review_output = tmp_path / "review.csv"
+            campaign = load_campaign(
+                ROOT / "campaigns" / "examples" / "scale-olympus.json"
+            )
+            manifest = run_company_qualification(
+                input_path=input_path,
+                output_path=output,
+                campaign=campaign,
+                commercial_focuses=CommercialFocusTable.load(campaign.focus_rules_path),
+                options=RunOptions(
+                    cache_dir=tmp_path / "cache",
+                    ready_output_path=fit_output,
+                    review_output_path=review_output,
+                ),
+                domain_enricher=MappingDomainEnricher(),
+            )
+
+            with output.open(encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle)
+                rows = list(reader)
+                headers = list(reader.fieldnames or [])
+            with fit_output.open(encoding="utf-8-sig", newline="") as handle:
+                fit_rows = list(csv.DictReader(handle))
+            with review_output.open(encoding="utf-8-sig", newline="") as handle:
+                review_rows = list(csv.DictReader(handle))
+
+            self.assertEqual(
+                [row["company_qualification_status"] for row in rows],
+                ["not_fit", "fit", "needs_review"],
+            )
+            self.assertEqual(rows[1]["company_fit_tier"], "core")
+            self.assertEqual(rows[2]["company_fit_tier"], "secondary")
+            self.assertNotIn("email_fit_status", headers)
+            self.assertNotIn("contact_fit_status", headers)
+            self.assertNotIn("personalized_email", headers)
+            self.assertNotIn("outreach_status", headers)
+            self.assertEqual([row["company_domain"] for row in fit_rows], ["core.example"])
+            self.assertEqual(
+                [row["company_domain"] for row in review_rows],
+                ["secondary.example"],
+            )
+            self.assertEqual(manifest["mode"], "company_qualification_only")
+            self.assertEqual(
+                manifest["qualification"]["status_counts"],
+                {"fit": 1, "needs_review": 1, "not_fit": 1},
+            )
+            self.assertTrue(
+                manifest["qualification"]["contact_email_and_copy_skipped"]
+            )
+            self.assertEqual(manifest["output"]["fit_output"]["row_count"], 1)
 
     def test_candidate_facts_drop_blocked_evidence(self) -> None:
         campaign = load_campaign(ROOT / "campaigns" / "campaign-template.json")
