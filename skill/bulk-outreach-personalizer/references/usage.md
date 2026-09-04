@@ -11,7 +11,7 @@ Each campaign defines:
 - `personalization.objective`: human-readable campaign intent;
 - `personalization.focus_rules_file`: campaign-relative path to the market-specific mapping CSV;
 - `personalization.banned_phrases`: phrases rejected in configured or rendered copy;
-- `personalization.blocked_evidence_phrases`: optional site-specific junk sentences that must never become company evidence (checked case-insensitively against candidate evidence before selection);
+- `personalization.blocked_evidence_phrases`: optional site-specific junk sentences that must never become company evidence (checked case-insensitively against candidate evidence and model quotes before selection);
 - `personalization.angles`: signal types mapped to approved subject/pitch pairs;
 - `personalization.min_confidence`: threshold for a `ready` row;
 - `personalization.low_confidence_action`: render for `review` or leave `blank`;
@@ -110,3 +110,9 @@ The manifest's `focus_gaps` object keeps `unmatched_domains`/`unmatched_samples`
 Company-contact sequencing ranks eligible contacts within each normalized company domain using qualification status, campaign title priority, configured seniority order, and original input order. Only rank 1 can remain ready. Later ranks retain their personalised copy but move to review with an explicit wave reason.
 
 `qualification.contact.priority_title_patterns` is an ordered list of campaign-specific regular expressions used before provider seniority when selecting rank 1. Put the most commercially relevant decision-maker pattern first.
+
+## Model truthfulness gates
+
+Model quotes need at least four words, must occur in fetched text, and cannot contain configured blocked phrases, navigation-only labels, or common cookie notices. A rejected decision falls back to the focus CSV. These filters do not guarantee semantic relevance.
+
+For `write_pitch: true`, numeric and spelled-out quantities and commercial promises require the entire risky sentence in `offer.approved_claims` (case/whitespace normalized). A partial phrase or just a number is insufficient. Rejected openings are replaced with approved template copy. Openings discussing offer mechanics require `review` even when approved; ordinary style rejections can remain ready after fallback. The reason is recorded in `personalization_error`. All existing qualification gates remain active. Slot mode ignores model-written pitches and retains approved template wording.

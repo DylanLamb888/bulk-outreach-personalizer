@@ -53,6 +53,8 @@
 - Campaign-level blocked evidence phrases filtered before candidate selection
 - Focus-gap manifest reporting with separate unmatched and intentional-exclusion samples
 - Cache pruning via `--prune-cache`
+- Model quote length, configured evidence blocks, navigation/cookie filters; phrase presence alone is not a relevance guarantee
+- Exact approved-sentence checks for model numeric/promissory copy, safe template fallback, and selective review for offer mechanics
 - Incremental validated model checkpoints, successful-peer recovery on fatal CLI errors, and thread-safe cumulative wave budgets
 - Model cache identity includes complete rendered system/company prompts and validation inputs; legacy partial-brief entries miss safely
 - Per-row containment of title-hook gaps and fail-closed empty-subject and blank-company-name handling
@@ -69,7 +71,7 @@
 ## Deliberate boundaries
 
 - Public websites, approved company intelligence already supplied in the input CSV, and explicit title-persona fallback; no login, CAPTCHA bypass, LinkedIn scraping, or private data access
-- No per-row LLM calls or agent-written personalization; the optional model step classifies each unique domain once, never writes copy, and is re-validated deterministically
+- No per-row LLM calls or agent-written personalization; the optional model step classifies each unique domain once and fills slots or writes a gated opening; offer variants remain campaign-approved
 - No email discovery or verification waterfall; the engine only evaluates supplied statuses and syntax
 - No automatic campaign sending or Smartlead mutation
 - JavaScript-only websites may produce a weak or missing signal unless the optional Firecrawl fallback is configured

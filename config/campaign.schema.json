@@ -604,7 +604,7 @@
             },
             "write_pitch": {
               "type": "boolean",
-              "description": "Let the model write the personalised opening pitch per company; offer line and CTA stay approved variants."
+              "description": "Write a factual model opening; unapproved numeric or commercial promises fall back to templates, and offer mechanics require review. False uses approved slot-filled templates."
             },
             "max_pitch_words": {
               "type": "integer",

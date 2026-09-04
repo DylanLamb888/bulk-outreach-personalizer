@@ -605,6 +605,7 @@ def _classify_domains_with_llm(
             cache_ttl_hours=options.llm_cache_ttl_hours,
             approved_claims=tuple(str(item) for item in offer.get("approved_claims", [])),
             forbidden_claims=tuple(str(item) for item in offer.get("forbidden_claims", [])),
+            blocked_evidence_phrases=campaign.blocked_evidence_phrases,
         )
     items = [
         LlmFocusItem(
@@ -2307,6 +2308,14 @@ def run_enrichment(
                 pitch_word_limit = campaign.llm_focus.max_pitch_words
             elif llm_decision is not None and llm_decision.usable and llm_decision.pitch_error:
                 errors.append(f"model pitch rejected: {llm_decision.pitch_error}")
+            if (
+                llm_decision is not None and llm_decision.usable
+                and llm_decision.pitch_review_reason
+                and campaign.llm_focus is not None and campaign.llm_focus.write_pitch
+                and commercial_focus.rule_id == LLM_RULE_ID
+            ):
+                values["personalization_status"] = "review"
+                errors.append(llm_decision.pitch_review_reason)
 
         values["personalization_error"] = "; ".join(error for error in errors if error)
         output_row.update(values)

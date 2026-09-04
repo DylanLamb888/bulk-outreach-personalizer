@@ -49,7 +49,7 @@ from bulk_enrich.focus import (
 )
 
 
-PROMPT_VERSION = "2"
+PROMPT_VERSION = "3"
 DEFAULT_MODEL = "claude-opus-5"
 DEFAULT_EFFORT = "low"
 PROVIDERS = ("claude-code", "codex", "api")
@@ -224,6 +224,7 @@ class LlmFocusDecision:
     evidence: str = ""
     pitch: str = ""
     pitch_error: str = ""
+    pitch_review_reason: str = ""
     reason: str = ""
     confidence: float = 0.0
     error: str = ""
@@ -252,6 +253,7 @@ class LlmFocusDecision:
             evidence=str(data.get("evidence", "")),
             pitch=str(data.get("pitch", "")),
             pitch_error=str(data.get("pitch_error", "")),
+            pitch_review_reason=str(data.get("pitch_review_reason", "")),
             reason=str(data.get("reason", "")),
             confidence=float(data.get("confidence", 0.0)),
             error=str(data.get("error", "")),
@@ -336,7 +338,8 @@ def build_system_prompt(
             "no company name. Example: companies hiring senior finance leaders.",
             f"- evidence: one sentence or fragment copied exactly, character for "
             f"character, from the website text that supports your decision, at most "
-            f"{MAX_EVIDENCE_QUOTE_WORDS} words. Do not paraphrase.",
+            f"{MAX_EVIDENCE_QUOTE_WORDS} words. Use at least four words about the business, "
+            "never navigation labels or cookie notices. Do not paraphrase.",
             (
                 f"- pitch: for core or secondary companies, one or two sentences, hard "
                 f"limit {limits.max_pitch_words} words, aim for about "
@@ -464,6 +467,8 @@ def validate_decision(
     company_name: str,
     evidence_text: str,
     limits: PhraseLimits,
+    approved_claims: tuple[str, ...] = (),
+    blocked_evidence_phrases: tuple[str, ...] = (),
 ) -> LlmFocusDecision:
     """Turn a model response into a decision the deterministic engine may use."""
     problems: list[str] = []
@@ -483,6 +488,8 @@ def validate_decision(
     evidence = _WHITESPACE_RE.sub(" ", str(raw.get("evidence", ""))).strip()
     if not evidence:
         problems.append("evidence quote is blank")
+    elif evidence_problem := _evidence_problem(evidence, blocked_evidence_phrases):
+        problems.append(evidence_problem)
     elif phrase_word_count(evidence) > MAX_EVIDENCE_QUOTE_WORDS:
         problems.append(f"evidence quote exceeds {MAX_EVIDENCE_QUOTE_WORDS} words")
     elif not evidence_quote_is_verbatim(evidence, evidence_text):
@@ -530,14 +537,18 @@ def validate_decision(
     # rather than discarding a verified fit decision.
     pitch = _WHITESPACE_RE.sub(" ", str(raw.get("pitch", ""))).strip()
     pitch_error = ""
+    pitch_review_reason = ""
     if fit_tier == "exclude":
         pitch = ""
     elif pitch:
+        if _describes_offer_mechanics(pitch):
+            pitch_review_reason = "model opening describes offer mechanics; use the approved offer line"
         pitch_error = validate_pitch(
             pitch,
             company_name=company_name,
             evidence_text=evidence_text,
             limits=limits,
+            approved_claims=approved_claims,
         )
         if pitch_error:
             pitch = ""
@@ -562,6 +573,7 @@ def validate_decision(
         evidence=evidence,
         pitch=pitch,
         pitch_error=pitch_error,
+        pitch_review_reason=pitch_review_reason,
         reason=reason,
         confidence=confidence,
     )
@@ -576,7 +588,62 @@ _PITCH_BANNED_OPENERS = (
     "hope you",
     "hope this",
 )
-_PITCH_UNSAFE_NUMBER_RE = re.compile(r"\b\d{2,}(?:[.,]\d+)?\s*(?:%|percent|x\b|clients|customers|calls|leads|meetings)", re.I)
+_QUANTITY_RE = re.compile(
+    r"\b(?:\d+(?:[.,]\d+)?|zero|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|"
+    r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?|"
+    r"millions?|billions?|dozens?|double|triple|twice)\b", re.I,
+)
+_PROMISE_RE = re.compile(
+    r"\b(?:guarantee\w*|risk[- ]free|no[- ](?:upfront[- ])?cost|no[- ](?:setup[- ])?fees?|"
+    r"money[- ]back|refund\w*|trial\w*)\b|(?<![\w-])free(?![\w-])", re.I,
+)
+_OFFER_TERMS_RE = re.compile(
+    r"[$£€]|\b(?:pric(?:e|es|ing)|fees?|payments?|pay|paid|costs?|charges?|discounts?|"
+    r"upfront|per[- ](?:call|lead|meeting|result)|every (?:week|month)|"
+    r"(?:weekly|monthly) (?:calls|leads|meetings))\b", re.I,
+)
+_VOLUME_RE = re.compile(r"\b(?:qualified\s+)?(?:meetings?|leads?|calls?|customers?|clients?|appointments?)\b", re.I)
+_COOKIE_RE = re.compile(
+    r"\b(?:(?:we|this (?:site|website)) uses? cookies|accept (?:all )?cookies|cookie (?:policy|preferences|consent)|"
+    r"manage (?:your )?(?:cookies|consent)|consent preferences|all rights reserved)\b", re.I,
+)
+_NAV_WORDS = frozenset("home about us our services products contact team menu login sign in up learn more click here read next back privacy policy terms conditions careers news resources solutions industries support search to find out".split())
+
+
+def _evidence_problem(evidence: str, blocked: tuple[str, ...]) -> str:
+    if phrase_word_count(evidence) < 4:
+        return "evidence quote contains fewer than four words"
+    if any(phrase.casefold() in evidence.casefold() for phrase in blocked if phrase.strip()):
+        return "evidence quote contains a blocked evidence phrase"
+    if _COOKIE_RE.search(evidence):
+        return "evidence quote is a cookie or boilerplate notice"
+    words = set(re.findall(r"[a-z]+", evidence.casefold()))
+    if words and words <= _NAV_WORDS:
+        return "evidence quote contains only navigation labels"
+    return ""
+
+
+def _describes_offer_mechanics(pitch: str) -> bool:
+    return bool(
+        _PROMISE_RE.search(pitch) or _OFFER_TERMS_RE.search(pitch)
+        or (_QUANTITY_RE.search(pitch) and _VOLUME_RE.search(pitch))
+    )
+
+
+def _unapproved_claim(pitch: str, approved_claims: tuple[str, ...]) -> bool:
+    # Require the entire risky sentence, not just its number or one approved
+    # fragment. Otherwise an approved quantity could license a new guarantee.
+    approved = {_WHITESPACE_RE.sub(" ", claim).strip().casefold().rstrip(".!?") for claim in approved_claims}
+    for sentence in re.split(r"[.!?](?:\s+|$)|;\s*", pitch):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        if _QUANTITY_RE.search(sentence) or _PROMISE_RE.search(sentence) or _OFFER_TERMS_RE.search(sentence):
+            if _WHITESPACE_RE.sub(" ", sentence).casefold().rstrip(".!?") not in approved:
+                return True
+    return False
+
 
 
 def validate_pitch(
@@ -585,6 +652,7 @@ def validate_pitch(
     company_name: str,
     evidence_text: str,
     limits: PhraseLimits,
+    approved_claims: tuple[str, ...] = (),
 ) -> str:
     """Return a rejection reason for a model-written pitch, or '' when it passes."""
     if phrase_word_count(pitch) > limits.max_pitch_words:
@@ -604,8 +672,8 @@ def validate_pitch(
     shared = longest_shared_phrase_words(pitch, evidence_text)
     if shared > limits.max_source_phrase_words:
         return f"pitch copies {shared} consecutive words from the website"
-    if _PITCH_UNSAFE_NUMBER_RE.search(pitch):
-        return "pitch states an unapproved figure"
+    if _unapproved_claim(pitch, approved_claims):
+        return "pitch states an unapproved figure or commercial promise"
     if "{{" in pitch or "}}" in pitch:
         return "pitch contains merge-field braces"
     return ""
@@ -1261,6 +1329,7 @@ class LlmFocusClassifier:
         refresh_cache: bool = False,
         approved_claims: tuple[str, ...] = (),
         forbidden_claims: tuple[str, ...] = (),
+        blocked_evidence_phrases: tuple[str, ...] = (),
     ) -> None:
         if not settings.enabled:
             raise LlmFocusError("llm_focus is not enabled for this campaign")
@@ -1271,6 +1340,8 @@ class LlmFocusClassifier:
         self.cache = cache
         self.transport = transport
         self.limits = limits
+        self.approved_claims = approved_claims
+        self.blocked_evidence_phrases = blocked_evidence_phrases
         self.cache_ttl_hours = cache_ttl_hours
         self.refresh_cache = refresh_cache
         self.system_prompt = build_system_prompt(
@@ -1309,6 +1380,7 @@ class LlmFocusClassifier:
                     "company_name": item.company_name,
                     "evidence_text": item.evidence_text,
                     "limits": asdict(self.limits),
+                    "blocked_evidence_phrases": self.blocked_evidence_phrases,
                 },
             },
             sort_keys=True,
@@ -1411,12 +1483,16 @@ class LlmFocusClassifier:
             raw = parse_response_text(result.text)
         except ValueError as exc:
             return LlmFocusDecision(domain=item.domain, status="error", error=str(exc), **usage)
+        if not self.settings.write_pitch:
+            raw["pitch"] = ""
         decision = validate_decision(
             item.domain,
             raw,
             company_name=item.company_name,
             evidence_text=item.evidence_text,
             limits=self.limits,
+            approved_claims=self.approved_claims,
+            blocked_evidence_phrases=self.blocked_evidence_phrases,
         )
         return LlmFocusDecision(**{**decision.to_dict(), **usage})
 

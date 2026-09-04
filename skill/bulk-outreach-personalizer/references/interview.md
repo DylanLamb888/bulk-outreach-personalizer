@@ -70,11 +70,17 @@ Ask, in this order:
 
 ## 5. The email
 
-- Keep the body template from the example: greeting, model-written pitch,
+- Keep the body template from the example: greeting, personalised pitch,
   approved offer line, approved CTA, sender name.
-- Confirm `llm_focus.write_pitch` is true so the opening is specific to each
-  company, and that `max_pitch_words` (default 30) and `quality.max_body_words`
-  (default 90) suit the operator's style.
+- Choose `llm_focus.write_pitch: false` for approved direct-pitch templates
+  filled with company and buyer slots, or `true` for a factual model opening.
+  Agree any quantities and prospect-dependent claim variants; example figures
+  are not production defaults. Keep commercial mechanics in the approved offer
+  line. Model openings repeating them require review; unapproved promises are
+  removed. Match word limits to the operator's style.
+- Check model quotes contain substantive business evidence, not just text
+  present on the page. Blocked phrases, short quotes, and obvious site junk
+  are rejected automatically; relevance still needs sample review.
 - Read two or three finished emails from the sample run aloud, in full, before
   asking for approval.
 

@@ -113,6 +113,44 @@ def _request(custom_id: str, domain: str, params: dict | None = None) -> LlmRequ
 
 
 class PromptAndValidationTests(unittest.TestCase):
+    def test_junk_and_blocked_model_quotes_are_rejected(self) -> None:
+        for quote in (
+            "executive search", "Home About Us Our Services Contact Us",
+            "We use cookies to improve your browsing experience",
+            "This website uses cookies to personalize your experience",
+            "Contact Us To Find Out More",
+            "Custom campaign junk that must never be used",
+        ):
+            with self.subTest(quote=quote):
+                decision = validate_decision(
+                    "x.example", {**GOOD_RAW, "evidence": quote}, company_name="Acme",
+                    evidence_text=quote, limits=LIMITS,
+                    blocked_evidence_phrases=("CUSTOM CAMPAIGN JUNK",),
+                )
+                self.assertEqual(decision.status, "rejected")
+                self.assertIn("evidence quote", decision.error)
+
+    def test_quantities_and_promises_require_exact_approved_sentences(self) -> None:
+        pitches = (
+            "We guarantee five qualified meetings every week at no upfront cost.",
+            "We can introduce you to twenty-five qualified buyers this month.",
+            "We can introduce you to 5 qualified buyers this month.",
+            "We can introduce you to 10-15 qualified buyers this month.",
+            "We will provide a free trial of our service for you.",
+            "We will refund your payment if we cannot deliver the results.",
+            "We can run your outreach with no-cost setup for you.",
+        )
+        for pitch in pitches:
+            with self.subTest(pitch=pitch):
+                kwargs = dict(company_name="Acme", evidence_text=SITE_TEXT, limits=LIMITS)
+                self.assertIn("unapproved", validate_pitch(pitch, **kwargs))
+                self.assertEqual(validate_pitch(pitch, approved_claims=(pitch,), **kwargs), "")
+                self.assertIn("unapproved", validate_pitch(pitch, approved_claims=("five qualified meetings",), **kwargs))
+        self.assertEqual(validate_pitch(
+            "You connect finance leaders with employers planning their next hire.",
+            company_name="Acme", evidence_text=SITE_TEXT, limits=LIMITS,
+        ), "")
+
     def test_request_uses_schema_cached_system_prompt_and_effort(self) -> None:
         item = LlmFocusItem("benskin.example", "Benskin Talent Partners", SITE_TEXT, "https://benskin.example/")
         system_prompt = build_system_prompt(
@@ -257,6 +295,7 @@ class ClassifierTests(unittest.TestCase):
             "audience": {"offer_audience": "Finance directors"},
             "approved claims": {"approved_claims": ("A free trial is available.",)},
             "forbidden claims": {"forbidden_claims": ("Do not promise a free trial.",)},
+            "blocked evidence": {"blocked_evidence_phrases": ("cookie preferences",)},
             "banned phrases": {"limits": replace(LIMITS, banned_phrases=("recruit",))},
             "pitch limit": {"limits": replace(LIMITS, max_pitch_words=12)},
             "source overlap limit": {"limits": replace(LIMITS, max_source_phrase_words=3)},
@@ -820,6 +859,81 @@ def _write_llm_campaign(tmp_path: Path, provider: str = "api") -> Path:
 
 
 class PipelineIntegrationTests(unittest.TestCase):
+    def test_offer_mechanics_are_reviewed_without_blocking_safe_or_slot_copy(self) -> None:
+        unsafe = "You advise business owners, and we guarantee five qualified meetings every week at no upfront cost."
+        approved = "We can introduce you to five qualified buyers every week."
+        safe = "You advise founders through business sales, so conversations with owners considering an exit could be useful."
+        cases = (
+            (unsafe, True, (), "review"),
+            (approved, True, (approved,), "review"),
+            (safe, True, (), "ready"),
+            (unsafe, False, (), "ready"),
+            ("I noticed you advise founders through business sales and acquisitions.", True, (), "ready"),
+        )
+        for pitch, write_pitch, claims, expected in cases:
+            with self.subTest(pitch=pitch, write_pitch=write_pitch), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                campaign_path = _write_llm_campaign(root)
+                payload = json.loads(campaign_path.read_text())
+                payload["personalization"]["llm_focus"]["write_pitch"] = write_pitch
+                payload["offer"]["approved_claims"] = list(claims) or ["We manage outreach."]
+                campaign_path.write_text(json.dumps(payload))
+                campaign = load_campaign(campaign_path)
+                raw = {
+                    **GOOD_RAW, "focus": "sell-side advisory",
+                    "buyer_phrase": "owners preparing a company sale",
+                    "evidence": "sell-side M&A advisory for private company owners", "pitch": pitch,
+                }
+                transport = RecordingTransport({"core.example": raw})
+                input_path = root / "leads.csv"
+                input_path.write_text(
+                    "Email,Email status,First name,Job title,Job seniority,Company name,Website\n"
+                    "ben@example.com,VERIFIED,Ben,Founder,Founder/Owner,Core Adviser,core.example\n"
+                )
+                with patch("bulk_enrich.pipeline.build_transport", return_value=transport):
+                    run_enrichment(
+                        input_path=input_path, output_path=root / "audit.csv",
+                        campaign=campaign,
+                        title_hooks=TitleHookTable.load(ROOT / "config" / "title-hooks.csv"),
+                        commercial_focuses=CommercialFocusTable.load(campaign.focus_rules_path),
+                        options=RunOptions(cache_dir=root / "cache", ready_output_path=root / "ready.csv", review_output_path=root / "review.csv"), domain_enricher=ProfileEnricher(),
+                    )
+                with (root / "audit.csv").open(encoding="utf-8-sig") as handle:
+                    row = next(csv.DictReader(handle))
+                self.assertEqual(row["outreach_status"], expected)
+                self.assertTrue(row["personalized_email"])
+                if pitch == unsafe:
+                    self.assertNotIn("guarantee five", row["personalized_email"])
+                if expected == "review":
+                    self.assertIn("offer mechanics", row["personalization_error"])
+                with (root / "ready.csv").open(encoding="utf-8-sig") as handle:
+                    self.assertEqual(len(list(csv.DictReader(handle))), int(expected == "ready"))
+
+    def test_pipeline_passes_blocked_evidence_to_classifier(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = _write_llm_campaign(root)
+            payload = json.loads(path.read_text())
+            payload["personalization"]["blocked_evidence_phrases"] = ["private company owners"]
+            path.write_text(json.dumps(payload))
+            campaign = load_campaign(path)
+            input_path = root / "companies.csv"
+            input_path.write_text("Company name,Website\nCore Adviser,core.example\n")
+            transport = RecordingTransport({"core.example": {
+                **GOOD_RAW, "evidence": "sell-side M&A advisory for private company owners",
+            }})
+            with patch("bulk_enrich.pipeline.build_transport", return_value=transport):
+                manifest = run_company_qualification(
+                    input_path=input_path, output_path=root / "audit.csv", campaign=campaign,
+                    commercial_focuses=CommercialFocusTable.load(campaign.focus_rules_path),
+                    options=RunOptions(cache_dir=root / "cache"), domain_enricher=ProfileEnricher(),
+                )
+            self.assertEqual(manifest["llm_focus"]["rejected"], 1)
+            with (root / "audit.csv").open(encoding="utf-8-sig") as handle:
+                row = next(csv.DictReader(handle))
+            self.assertNotEqual(row["company_fit_rule"], "llm-focus")
+            self.assertNotEqual(row["company_qualification_status"], "fit")
+
     def _decisions(self) -> dict[str, LlmFocusDecision]:
         return {
             "core.example": LlmFocusDecision(

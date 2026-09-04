@@ -76,6 +76,10 @@ In this mode, `--ready-output` contains `fit` rows and `--review-output` contain
 - `excluded`: at least one company, contact, email, or duplicate gate failed; send copy is blank.
 - `error`: technical rendering failed after the qualification gates passed.
 
+Model openings mentioning offer mechanics require `review`, with the reason in `personalization_error`. Unapproved numeric/commercial promises are removed and approved fallback copy is rendered. Style-only failures may still become ready through fallback; slot mode ignores returned model pitches. Company, contact, email, and duplicate exclusions still take precedence.
+
+Model quotes are rejected if under four words, blocked by campaign phrases, navigation-only, or common cookie notices. Rejection falls back to regex rules and does not establish semantic relevance of remaining quotes.
+
 Only `ready` rows should be uploaded without review.
 
 Only one qualified contact per company domain can be `ready` in a single run. Additional eligible contacts retain their copy, receive a deterministic rank, and move to `review` for later outreach waves.
