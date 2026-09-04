@@ -508,7 +508,10 @@ def _llm_evidence_text(signal: SiteSignal | None) -> str:
     """Website text a model may classify: fetched pages only, never CSV fields."""
     if signal is None or signal.status not in _LLM_CLASSIFIABLE_STATUSES:
         return ""
-    if signal.page_digest.strip():
+    # Source URL markers alone contain no company evidence. Keep original text
+    # when readable content exists so verbatim quote checks remain unchanged.
+    readable = re.sub(r"https?://[^\s\]<>]+", "", signal.page_digest)
+    if any(character.isalnum() for character in readable):
         return signal.page_digest
     if signal.status != "ok":
         return ""

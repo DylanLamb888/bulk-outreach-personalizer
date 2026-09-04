@@ -27,3 +27,5 @@ Draft email 2 variants A/B and email 3 variants A/B as alternatives within their
 Save campaign-specific drafts in ignored `outputs/<campaign>/sequence-draft.md`. Render each variant against actual ready rows locally, check missing fields, word counts, unsupported claims, and awkward slot grammar, and show complete examples to the operator. No new website or per-company model calls are needed to reuse existing fields.
 
 The current CLI renders only email 1. It does not automatically export follow-up columns, validate follow-up bodies, upload a sequence, or schedule messages. A row's `ready` status applies to its generated first email; it does not approve newly drafted follow-ups. Hand over the approved shared follow-up templates alongside the ready CSV and verify imported-field previews before launch. Never upload, launch, or send without explicit authorization.
+
+Before scaling, check whether the manifest sample-quality assessment was evaluated. Its minimum counts rendered company emails, not input rows: a 20-row sample with fetch failures or exclusions may not exercise the repetition gate. Report this explicitly.

@@ -923,6 +923,37 @@ def _write_llm_campaign(tmp_path: Path, provider: str = "api") -> Path:
 
 
 class PipelineIntegrationTests(unittest.TestCase):
+    def test_url_only_pages_never_reach_classifier(self) -> None:
+        class UrlOnlyEnricher(ProfileEnricher):
+            def enrich(self, domain):
+                signal = super().enrich(domain)
+                if domain == "quiet.example":
+                    return replace(signal, page_digest="[https://quiet.example/]\n[https://quiet.example/about]")
+                return signal
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_path = root / "leads.csv"
+            input_path.write_text(
+                "Email,Email status,First name,Job title,Job seniority,Company name,Website\n"
+                "ben@example.com,VERIFIED,Ben,Founder,Founder/Owner,Core Adviser,core.example\n"
+                "dee@example.com,VERIFIED,Dee,Owner,Founder/Owner,Quiet Cleaning,quiet.example\n"
+            )
+            campaign = load_campaign(_write_llm_campaign(root))
+            stub = StubClassifier(self._decisions())
+            run_enrichment(
+                input_path=input_path, output_path=root / "audit.csv", campaign=campaign,
+                title_hooks=TitleHookTable.load(ROOT / "config" / "title-hooks.csv"),
+                commercial_focuses=CommercialFocusTable.load(campaign.focus_rules_path),
+                options=RunOptions(cache_dir=root / "cache"),
+                domain_enricher=UrlOnlyEnricher(), llm_classifier=stub,
+            )
+            self.assertEqual([item.domain for item in stub.items], ["core.example"])
+            with (root / "audit.csv").open() as handle:
+                rows = {row["Website"]: row for row in csv.DictReader(handle)}
+            self.assertEqual(rows["core.example"]["outreach_status"], "ready")
+            self.assertEqual(rows["quiet.example"]["personalized_email"], "")
+
     def test_offer_mechanics_are_reviewed_without_blocking_safe_or_slot_copy(self) -> None:
         unsafe = "You advise business owners, and we guarantee five qualified meetings every week at no upfront cost."
         approved = "We can introduce you to five qualified buyers every week."
