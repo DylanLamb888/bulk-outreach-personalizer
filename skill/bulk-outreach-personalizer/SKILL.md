@@ -26,6 +26,8 @@ Each unique company website is fetched once and cached. For each company, one mo
 
 ## Modes and flags
 
+For follow-ups or a complete sequence, use the installed `cold-email-generator` skill with the already confirmed campaign brief. Follow `references/sequences.md`: preserve approved first emails, draft shared follow-up variants, and reuse exported company/service/buyer fields. The Python CLI still generates email 1 only; follow-up approval and sending-platform setup are separate.
+
 - `--digest-only`: fetch pages and write `company_page_digest` per row, no campaign, no model. Use it for step 3.
 - `--validate-only`: check CSV, campaign, provider readiness, and the usage estimate without fetching.
 - `--company-qualification-only`: fit, needs_review, and not_fit per company with no contacts or copy, when the operator only wants to know who belongs on the list.

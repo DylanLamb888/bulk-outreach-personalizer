@@ -95,3 +95,5 @@ run or quietly fall back to regex for the unprocessed list.
 Only after the operator has approved the target description, the claims, the
 offer line, the CTA, and the sample emails, change `status` to `approved` and
 run the full list. Record the approval in the conversation.
+
+When follow-ups are requested, reuse this confirmed brief with cold-email-generator via `sequences.md`. Preserve approved first-email copy and review complete follow-up previews before sending-platform setup.

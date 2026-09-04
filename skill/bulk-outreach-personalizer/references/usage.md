@@ -120,3 +120,5 @@ For `write_pitch: true`, numeric and spelled-out quantities and commercial promi
 Subscription throttling is retried at most three times, after 5, 15, and 30 seconds. Persistent throttling stops the run with a clear error; it never silently downgrades the remaining list to regex copy. Completed decisions remain cached. Wait for the subscription reset before resuming. The manifest reports `retry_count`; metered retry usage is included when the CLI reports it.
 
 Codex live status (2026-09-04): untested. The installed `/opt/homebrew/bin/codex` npm wrapper fails with `ENOENT` because its native executable is missing. Version, help, and login-status checks never reached the CLI; no five-domain test ran and no model usage occurred. Fake-runner tests cover transport behavior, not live authentication or model compatibility. Keep the default Claude Code provider for now.
+
+For shared follow-ups using existing exported company fields, follow `sequences.md` and the installed cold-email-generator skill. Follow-up templates are separate draft artifacts; the CLI does not render or validate them.

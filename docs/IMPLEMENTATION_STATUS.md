@@ -87,3 +87,5 @@
 The engine can later accept optional API-backed fetch adapters without changing the campaign or CSV output contract.
 
 Codex live status (2026-09-04): untested. The installed `/opt/homebrew/bin/codex` npm wrapper fails with `ENOENT` because its native executable is missing. Version, help, and login-status checks never reached the CLI; no five-domain test ran and no model usage occurred. Fake-runner tests cover transport behavior, not live authentication or model compatibility. Keep the default Claude Code provider for now.
+
+Sequence composition is supported as an assistant workflow with the installed cold-email-generator skill. It produces shared follow-up templates from the confirmed brief and previews existing ready-row fields. Automatic follow-up CSV generation, validation, scheduling, and uploads are not implemented.

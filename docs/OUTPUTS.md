@@ -1,5 +1,7 @@
 # Output contract
 
+The current CLI generates the first email only. Shared follow-ups can use the existing `personalization_focus` and `personalization_buyer_phrase` columns; follow-up bodies are not automatically exported or covered by the first email's `ready` status. See `skill/bulk-outreach-personalizer/references/sequences.md` for the cold-email-generator handoff.
+
 The CLI preserves every input column and row order, then appends the campaign's configured output fields.
 
 ## Digest-only output
