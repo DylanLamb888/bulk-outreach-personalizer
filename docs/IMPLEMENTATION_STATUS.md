@@ -89,3 +89,12 @@ The engine can later accept optional API-backed fetch adapters without changing 
 Codex live status (2026-09-04): untested. The installed `/opt/homebrew/bin/codex` npm wrapper fails with `ENOENT` because its native executable is missing. Version, help, and login-status checks never reached the CLI; no five-domain test ran and no model usage occurred. Fake-runner tests cover transport behavior, not live authentication or model compatibility. Keep the default Claude Code provider for now.
 
 Sequence composition is supported as an assistant workflow with the installed cold-email-generator skill. It produces shared follow-up templates from the confirmed brief and previews existing ready-row fields. Automatic follow-up CSV generation, validation, scheduling, and uploads are not implemented.
+
+## Complete sequence delivery
+
+Implemented optional campaign-owned sequence rendering, inline greetings,
+deterministic opt-out variants, exact editorial replacements, complete-sequence
+validation and compact `--smartlead-output` bundles. `--render-only` replays new
+audit sidecars offline and refuses changes to research/qualification inputs.
+Legacy campaigns retain first-email behaviour. Automated QA, editorial review
+and platform verification have separate statuses. No platform mutation occurs.

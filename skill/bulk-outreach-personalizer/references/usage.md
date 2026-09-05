@@ -135,3 +135,12 @@ literal lines starting `p.s. `, and `max_followup_words` (default 55). First-ema
 body limits include the P.S. too. Exact `editorial_replacements` and domain-keyed
 `company_name_overrides` require `text` and a documented `reason` for each entry;
 keep them in the local campaign. See docs/OUTPUTS.md for the output contract.
+
+### Complete delivery CLI
+
+Add `--smartlead-output <file.csv>` to normal enrichment to produce a compact
+complete-sequence import and its held/disposition/review/preview/mapping bundle.
+Use `--render-only --input <audit.csv> --output <new-audit.csv>` with the campaign
+and saved `.render-state.json` sidecar for copy revisions without model calls.
+Classification/targeting changes are rejected; do not bypass this by editing
+saved audit or sidecar data. Existing pre-sidecar audits require a normal run.

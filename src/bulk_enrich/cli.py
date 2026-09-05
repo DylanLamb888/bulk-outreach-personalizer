@@ -85,6 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="Validate and run deterministic bulk outreach personalisation.",
     )
     parser.add_argument("--input", required=True, help="Source lead CSV")
+    parser.add_argument("--smartlead-output", help="Compact complete-sequence CSV and delivery bundle")
+    parser.add_argument("--render-only", action="store_true", help="Render a saved audit without research or model calls")
     parser.add_argument("--output", required=True, help="Destination enriched CSV")
     parser.add_argument(
         "--campaign",
@@ -387,6 +389,8 @@ def main(argv: list[str] | None = None) -> int:
                 Path(args.cache_dir).expanduser().resolve()
             ).prune(ttl_hours=args.cache_ttl_hours)
             print(f"pruned {removed} expired cache entries", file=sys.stderr)
+        if args.digest_only and (args.render_only or args.smartlead_output):
+            raise ValueError("digest-only cannot render or export Smartlead copy")
         if args.digest_only:
             manifest = run_digests(
                 input_path=args.input,
@@ -419,6 +423,23 @@ def main(argv: list[str] | None = None) -> int:
         if not args.campaign:
             raise ValueError("--campaign is required unless --digest-only is used")
         campaign = load_campaign(args.campaign)
+        if args.render_only:
+            if args.validate_only or args.company_qualification_only or args.digest_only or args.focus_rules:
+                raise ValueError('--render-only cannot combine with other modes or --focus-rules')
+            if campaign.status == 'test_only' and not args.allow_test_campaign:
+                raise ValueError('test_only campaign requires --allow-test-campaign')
+            from bulk_enrich.delivery import run_render_only
+            result = run_render_only(input_path=args.input, output_path=args.output, campaign=campaign,
+                options=RunOptions(cache_dir=Path(args.cache_dir),
+                    smartlead_output_path=Path(args.smartlead_output) if args.smartlead_output else None,
+                    ready_output_path=Path(args.ready_output) if args.ready_output else None,
+                    review_output_path=Path(args.review_output) if args.review_output else None,
+                    manifest_path=Path(args.manifest) if args.manifest else None))
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0
+        if args.smartlead_output and args.company_qualification_only:
+            raise ValueError('--smartlead-output requires contact enrichment')
+
         if args.validate_only:
             payload = _validation_payload(
                 args.input,
@@ -499,6 +520,9 @@ def main(argv: list[str] | None = None) -> int:
                 llm_batch_ids=tuple(args.llm_batch_id),
                 llm_budget_usd=args.llm_budget_usd,
             )
+            if args.smartlead_output:
+                from dataclasses import replace
+                options = replace(options, smartlead_output_path=Path(args.smartlead_output).expanduser().resolve())
             if args.company_qualification_only:
                 manifest = run_company_qualification(
                     input_path=args.input,
@@ -522,6 +546,7 @@ def main(argv: list[str] | None = None) -> int:
                     log=log,
                 )
             payload = {
+                "delivery": manifest.get("delivery"),
                 "status": "completed",
                 "mode": manifest["mode"],
                 "campaign_id": campaign.campaign_id,

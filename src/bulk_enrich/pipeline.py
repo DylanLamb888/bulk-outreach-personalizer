@@ -94,6 +94,7 @@ class RunOptions:
     manifest_path: Path | None = None
     ready_output_path: Path | None = None
     review_output_path: Path | None = None
+    smartlead_output_path: Path | None = None
     llm_mode: str = "sync"
     llm_concurrency: int = 2
     llm_poll_seconds: float = 30.0
@@ -1105,10 +1106,15 @@ def _sequence_company_contacts(
 
 def _clean_first_name(value: str) -> str:
     """Keep only the conversational given name from noisy provider fields."""
-    cleaned = " ".join(value.strip().split())
-    if not cleaned:
-        return ""
-    return cleaned.split()[0].strip(" ,;:")
+    for token in value.strip().split():
+        token = token.strip(" ,;:.")
+        if token.casefold() in {"dr", "mr", "mrs", "ms", "prof"}:
+            continue
+        while token and not token[0].isalpha():
+            token = token[1:]
+        if token and any(char.isalpha() for char in token):
+            return token
+    return ""
 
 
 def _company_assignment_key(
@@ -1869,6 +1875,7 @@ def run_company_qualification(
         "llm_focus": llm_stats,
         "settings": {
             **asdict(options),
+            "smartlead_output_path": str(options.smartlead_output_path) if options.smartlead_output_path else None,
             "cache_dir": str(options.cache_dir),
             "manifest_path": str(manifest_path),
             "ready_output_path": (
@@ -1912,6 +1919,8 @@ def run_enrichment(
 ) -> dict[str, object]:
     started_at = datetime.now(UTC)
     started_monotonic = time.monotonic()
+    from bulk_enrich.delivery import validate_paths
+    validate_paths(input_path, output_path, options)
     data = load_csv(input_path)
     input_resolved = data.path
     output_resolved = Path(output_path).expanduser().resolve()
@@ -2339,6 +2348,10 @@ def run_enrichment(
                 )
             )
 
+    from bulk_enrich.delivery import capture_state, sequence_rows, save_state, write_delivery
+    from bulk_enrich.sequence import SEQUENCE_FIELDS
+    replay_state = capture_state(output_rows, render_jobs, company_keys, data.column_map,
+                                 data.headers, campaign, commercial_focuses, title_hooks)
     company_focus_rules = [
         (job.assignment_key, job.focus_rule) for job in render_jobs
     ]
@@ -2400,6 +2413,9 @@ def run_enrichment(
         seniority_header=data.column_map.get("job_seniority", ""),
         title_header=data.column_map.get("job_title", ""),
     )
+    sequence_contexts = sequence_rows(output_rows, replay_state, campaign)
+    if "sequence" in campaign.data:
+        append_fields = list(dict.fromkeys([*append_fields, *SEQUENCE_FIELDS]))
     personalization_status_counts = Counter(
         row.get("personalization_status", "error") for row in output_rows
     )
@@ -2574,6 +2590,7 @@ def run_enrichment(
         "llm_focus": llm_stats,
         "settings": {
             **asdict(options),
+            "smartlead_output_path": str(options.smartlead_output_path) if options.smartlead_output_path else None,
             "cache_dir": str(options.cache_dir),
             "manifest_path": str(manifest_path),
             "ready_output_path": (
@@ -2597,5 +2614,11 @@ def run_enrichment(
             else {"enabled": False}
         ),
     }
+    manifest["render_state"] = save_state(output_resolved, replay_state)
+    if options.smartlead_output_path:
+        manifest["delivery"] = write_delivery(options.smartlead_output_path, output_rows,
+                                              replay_state, campaign, sequence_contexts)
+        manifest["delivery"]["llm_focus"] = llm_stats
+        _atomic_json(Path(manifest["delivery"]["files"]["manifest"]), manifest["delivery"])
     _atomic_json(manifest_path, manifest)
     return manifest

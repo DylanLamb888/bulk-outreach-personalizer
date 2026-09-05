@@ -118,6 +118,8 @@ def render_sequence(campaign: CampaignConfig, context: dict, domain: str, first_
     base = int(hashlib.sha256(domain.encode()).hexdigest(), 16)
     claims = tuple(str(x) for x in campaign.data['offer'].get('approved_claims', []))
     claims += (str(context.get('cta', '')), str(context.get('risk_reversal', '')))
+    claims += tuple(sentence.strip() for value in (str(context.get('cta', '')), str(context.get('risk_reversal', '')))
+                    for sentence in re.split(r'[.!?](?:\s+|$)|;\s*', value) if sentence.strip())
     for index, (field, body) in enumerate(bodies.items()):
         if body.splitlines().count(sender) != 1 or not body.endswith('\n\n' + sender):
             raise ValueError(f'{field}: missing or duplicate signature')
@@ -127,7 +129,11 @@ def render_sequence(campaign: CampaignConfig, context: dict, domain: str, first_
         for slot in ('company_focus', 'buyer_phrase'):
             if _unapproved_claim(str(context.get(slot, '')), claims):
                 raise ValueError(f'{field}: unapproved claim in {slot}')
-        if field in FOLLOWUPS and _unapproved_claim(body.replace(str(context.get('company_name', '')), ''), claims):
+        selling_copy = body.removesuffix('\n\n' + sender)
+        if field == 'personalized_email':
+            selling_copy = re.sub(r'^Hi [^\n]+?(?: - |,\n\n)', '', selling_copy, count=1)
+        selling_copy = selling_copy.replace(str(context.get('company_name', '')), '')
+        if _unapproved_claim(selling_copy, claims):
             raise ValueError(f'{field}: unapproved figure or commercial promise')
         if variants:
             body += '\n\n' + variants[(base + index) % len(variants)]

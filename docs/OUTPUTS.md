@@ -140,3 +140,27 @@ source fields. Unknown placeholders, empty required slots without an approved
 neutral template, duplicate signatures/P.S., banned wording and unapproved
 quantities/promises reject the sequence. Quantitative follow-up claims must
 match approved claim sentences or the selected approved CTA/offer sentence.
+
+### Complete delivery and offline revisions
+
+`--smartlead-output outputs/<campaign>/smartlead.csv` adds a compact UTF-8 CSV:
+`email`, `first_name`, `company_name`, `personalized_subject`, `personalized_email`,
+and (when sequence is configured) the four follow-up columns. Every configured
+message must pass before inclusion. Failed sequence copy is review, not proof
+of poor company fit. Source audit columns are retained unchanged.
+
+Companion files use the requested upload stem: `.held.csv`, `.disposition.csv`,
+`.previews.md`, `.copy-review.csv`, `.mapping.md`, `.manifest.json`. Every input
+row has a disposition. The review queue covers distinct service/buyer/template
+combinations; previews cover templates and evidence modes. Manifests separate
+successful automated checks from pending editorial review and unverified
+platform rendering. No file claims that messages were uploaded or sent.
+
+New enrichment audits also have `<audit>.render-state.json`. Preserve this
+sidecar with its audit. `--render-only --input audit.csv --output revised.csv`
+rebuilds copy using saved contexts and qualification, with no provider preflight,
+HTTP requests or model calls. It supports presentation, approved template,
+CTA/offer-line, sequence and output-limit changes. Changed targeting, claims,
+classification limits, fallback policy, focus rules or title hooks require a new
+enrichment run. Modified audits and legacy audits without a sidecar cannot be
+replayed. Source evidence remains unchanged; outputs must use distinct paths.

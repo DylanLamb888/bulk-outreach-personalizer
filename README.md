@@ -779,3 +779,22 @@ Self-hosted Firecrawl should sit behind a secure proxy that blocks private and l
 Subscription throttling is retried at most three times, after 5, 15, and 30 seconds. Persistent throttling stops the run with a clear error; it never silently downgrades the remaining list to regex copy. Completed decisions remain cached. Wait for the subscription reset before resuming. The manifest reports `retry_count`; metered retry usage is included when the CLI reports it.
 
 Codex live status (2026-09-04): untested. The installed `/opt/homebrew/bin/codex` npm wrapper fails with `ENOENT` because its native executable is missing. Version, help, and login-status checks never reached the CLI; no five-domain test ran and no model usage occurred. Fake-runner tests cover transport behavior, not live authentication or model compatibility. Keep the default Claude Code provider for now.
+
+### Complete sequences and offline copy revisions
+
+Optional campaign `sequence` settings generate four follow-up alternatives and
+natural P.S. lines from approved templates, using the same company research.
+New sequence campaigns default to inline greetings; existing campaigns are
+unchanged. `quality.max_body_words` includes the P.S. Follow-ups default to 55
+words including their signature and P.S. See [output contracts](docs/OUTPUTS.md).
+
+```bash
+python3 scripts/enrich.py --input leads.csv --campaign campaigns/local/client.json --output outputs/client/audit.csv --smartlead-output outputs/client/smartlead.csv
+python3 scripts/enrich.py --render-only --input outputs/client/audit.csv --campaign campaigns/local/client.json --output outputs/client/revised-audit.csv --smartlead-output outputs/client/revised-smartlead.csv
+```
+
+The second command requires the first audit's `.render-state.json` sidecar and
+makes no research or model calls. Targeting or classification changes require
+fresh enrichment. The delivery includes held exceptions, a disposition ledger,
+copy review queue, complete previews, mapping instructions and a manifest.
+Editorial review and live Smartlead preview remain separate from automated QA.

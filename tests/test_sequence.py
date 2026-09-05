@@ -82,6 +82,19 @@ class SequenceTests(unittest.TestCase):
             cfg = sequence_config(); edit(cfg.data['sequence'])
             with self.assertRaises(ValueError):validate_sequence(cfg.data)
 
+    def test_first_email_promise_requires_the_complete_approved_claim(self):
+        body = 'Hi Ana - we guarantee five qualified meetings every week.\n\nDylan'
+        with self.assertRaisesRegex(ValueError, 'unapproved'):
+            render_sequence(self.config, self.context, 'example.test', body)
+        self.config.data['offer']['approved_claims'] = ['We guarantee five qualified meetings every week.']
+        result = render_sequence(self.config, self.context, 'example.test', body)
+        self.assertEqual(result['sequence_status'], 'ready')
+
+    def test_greeting_removes_badges_and_titles_without_losing_name(self):
+        from bulk_enrich.pipeline import _clean_first_name
+        for raw, expected in [('🐧 Martin', 'Martin'), ('Dr Peter', 'Peter'), ('Élodie', 'Élodie'), ('🐧', '')]:
+            self.assertEqual(_clean_first_name(raw), expected)
+
     def test_legacy_configuration_unchanged(self):
         del self.config.data['sequence']
         self.assertEqual(render_sequence(self.config, {}, '', self.body), {'personalized_email': self.body})
