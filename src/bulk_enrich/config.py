@@ -1139,4 +1139,9 @@ def load_campaign(path: str | Path) -> CampaignConfig:
         raise CampaignConfigError(f"invalid JSON in {campaign_path}: {exc}") from exc
 
     validate_campaign_data(data)
+    from bulk_enrich.sequence import validate_sequence
+    try:
+        validate_sequence(data)
+    except ValueError as exc:
+        raise CampaignConfigError(str(exc)) from exc
     return CampaignConfig(path=campaign_path, data=data)

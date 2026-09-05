@@ -361,6 +361,8 @@ def _build_copy(
     angle: CopyAngle | None = None,
     max_pitch_words: int | None = None,
 ) -> RenderedCopy:
+    from bulk_enrich.sequence import editorial_context
+    context = editorial_context(campaign, context, domain)
     angle = angle or _angle_for_signal(campaign, signal_type)
     pitch_limit = max_pitch_words or campaign.max_words
     failures: list[str] = []

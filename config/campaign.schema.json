@@ -766,6 +766,134 @@
     },
     "notes": {
       "type": "string"
+    },
+    "sequence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "followups"
+      ],
+      "properties": {
+        "greeting": {
+          "enum": [
+            "inline",
+            "paragraph"
+          ],
+          "default": "inline"
+        },
+        "followups": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "followup_2a",
+            "followup_2b",
+            "followup_3a",
+            "followup_3b"
+          ],
+          "properties": {
+            "followup_2a": {
+              "type": "string",
+              "minLength": 1
+            },
+            "followup_2b": {
+              "type": "string",
+              "minLength": 1
+            },
+            "followup_3a": {
+              "type": "string",
+              "minLength": 1
+            },
+            "followup_3b": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "neutral_followups": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "followup_2a",
+            "followup_2b",
+            "followup_3a",
+            "followup_3b"
+          ],
+          "properties": {
+            "followup_2a": {
+              "type": "string",
+              "minLength": 1
+            },
+            "followup_2b": {
+              "type": "string",
+              "minLength": 1
+            },
+            "followup_3a": {
+              "type": "string",
+              "minLength": 1
+            },
+            "followup_3b": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "ps_variants": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^p\\.s\\. [^\\r\\n]+$"
+          }
+        },
+        "max_followup_words": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 200,
+          "default": 55
+        },
+        "editorial_replacements": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "reason"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "company_name_overrides": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "reason"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

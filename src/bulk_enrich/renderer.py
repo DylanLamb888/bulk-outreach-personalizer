@@ -54,7 +54,8 @@ def render_email(
     subject = render_merge_fields(subject_template, context).strip()
     body = render_merge_fields(data["email"]["body"], context).strip()
     body = re.sub(r"\n[ \t]*\n(?:[ \t]*\n)+", "\n\n", body)
-    return subject, body
+    from bulk_enrich.sequence import inline_body
+    return subject, inline_body(campaign, body)
 
 
 def word_count(value: str) -> int:

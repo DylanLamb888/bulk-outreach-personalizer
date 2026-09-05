@@ -121,3 +121,22 @@ Codex live execution is untested as of 2026-09-04 because the installed CLI cann
 URL-only page digests are not sent for model classification. They contain no readable company evidence; existing fallback and qualification gates still apply.
 
 Assistant-led upload recovery can produce a separate import and disposition ledger; it does not change the original CLI audit statuses. Keep original-ready, source-list personalisation, neutral-offer recovery and held exceptions distinguishable. See `skill/bulk-outreach-personalizer/references/recovery.md`.
+
+## Optional complete sequences
+
+Campaigns may configure `sequence.followups` with `followup_2a`, `followup_2b`,
+`followup_3a`, and `followup_3b`, plus optional `neutral_followups` with the same
+keys. Templates contain body copy only: the renderer appends the sender and one
+`sequence.ps_variants` entry. A/B variants are alternatives within each step.
+`sequence.greeting` defaults to `inline`; `paragraph` preserves the original
+first-email layout. Campaigns without `sequence` retain their previous output.
+`max_followup_words` defaults to 55 including the signature and P.S.; first-email
+limits still use `quality.max_body_words`, also including the P.S.
+
+Exact `editorial_replacements` map original service/buyer phrases to objects
+containing `text` and `reason`. `company_name_overrides` uses company domains as
+keys and the same objects. These affect rendered copy only, never evidence or
+source fields. Unknown placeholders, empty required slots without an approved
+neutral template, duplicate signatures/P.S., banned wording and unapproved
+quantities/promises reject the sequence. Quantitative follow-up claims must
+match approved claim sentences or the selected approved CTA/offer sentence.
