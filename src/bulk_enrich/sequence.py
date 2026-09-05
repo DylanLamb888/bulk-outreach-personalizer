@@ -28,7 +28,7 @@ MERGE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
 
 def validate_sequence(data: dict) -> None:
     seq = data.get("sequence")
-    if seq is None:
+    if "sequence" not in data:
         return
     if not isinstance(seq, dict):
         raise ValueError("sequence must be an object")

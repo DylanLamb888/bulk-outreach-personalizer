@@ -75,13 +75,33 @@
       "exclude_title_patterns": [
         "\\b(?:assistant|associate|analyst|intern|student|coordinator|co-ordinator|specialist)\\b"
       ],
-      "ready_seniorities": ["C-Suite", "Founder/Owner", "Partner", "Director"],
-      "review_seniorities": ["Vice President", "Head"]
+      "ready_seniorities": [
+        "C-Suite",
+        "Founder/Owner",
+        "Partner",
+        "Director"
+      ],
+      "review_seniorities": [
+        "Vice President",
+        "Head"
+      ]
     },
     "email": {
-      "accepted_statuses": ["verified", "valid"],
-      "review_statuses": ["catch-all", "risky", "unknown", "unverified"],
-      "rejected_statuses": ["invalid", "bounced", "do not email"],
+      "accepted_statuses": [
+        "verified",
+        "valid"
+      ],
+      "review_statuses": [
+        "catch-all",
+        "risky",
+        "unknown",
+        "unverified"
+      ],
+      "rejected_statuses": [
+        "invalid",
+        "bounced",
+        "do not email"
+      ],
       "missing_status_action": "syntax"
     }
   },
@@ -105,13 +125,34 @@
     "row_fallback": {
       "enabled": true,
       "fields": [
-        {"header": "Company description", "confidence": 0.82},
-        {"header": "AI One-Liner", "confidence": 0.78},
-        {"header": "AI Description", "confidence": 0.76},
-        {"header": "Products", "confidence": 0.74},
-        {"header": "Service Tags", "confidence": 0.73},
-        {"header": "Company keywords", "confidence": 0.72},
-        {"header": "Company industry", "confidence": 0.72}
+        {
+          "header": "Company description",
+          "confidence": 0.82
+        },
+        {
+          "header": "AI One-Liner",
+          "confidence": 0.78
+        },
+        {
+          "header": "AI Description",
+          "confidence": 0.76
+        },
+        {
+          "header": "Products",
+          "confidence": 0.74
+        },
+        {
+          "header": "Service Tags",
+          "confidence": 0.73
+        },
+        {
+          "header": "Company keywords",
+          "confidence": 0.72
+        },
+        {
+          "header": "Company industry",
+          "confidence": 0.72
+        }
       ]
     },
     "fallback_copy": {
@@ -124,7 +165,9 @@
       "templates": [
         {
           "id": "general-title-fallback",
-          "personas": ["*"],
+          "personas": [
+            "*"
+          ],
           "subject": "Relevant subject",
           "pitch": "Replace with an approved title-based outreach question."
         }
@@ -161,7 +204,9 @@
     "angles": [
       {
         "id": "verified-signal",
-        "signal_types": ["*"],
+        "signal_types": [
+          "*"
+        ],
         "templates": [
           {
             "id": "direct-question",
@@ -236,5 +281,22 @@
       "outreach_reason"
     ]
   },
-  "notes": "Copy this file into campaigns/local, replace the example template, and approve the copy before production use."
+  "notes": "Campaign scaffold: replace the offer, claims, CTA, first-email and follow-up templates from the confirmed brief. Draft and approve the whole sequence before production. Example quantities are not approved promises.",
+  "sequence": {
+    "greeting": "inline",
+    "max_followup_words": 55,
+    "followups": {
+      "followup_2a": "Would a short outline help you decide?",
+      "followup_2b": "{{cta}}",
+      "followup_3a": "Would that be useful for you?",
+      "followup_3b": "Who would be the right person at {{company_short_name}} to speak to about this?"
+    },
+    "ps_variants": [
+      "p.s. if this isn’t something you’re interested in, just reply \"no thanks\" and I’ll take you off my list.",
+      "p.s. if you’d rather I didn’t email you again, just reply \"no thanks\" and I’ll take you off my list.",
+      "p.s. if this isn’t relevant to you, just reply \"no thanks\" and I’ll take you off my list."
+    ],
+    "editorial_replacements": {},
+    "company_name_overrides": {}
+  }
 }

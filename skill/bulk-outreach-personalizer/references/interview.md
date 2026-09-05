@@ -2,13 +2,12 @@
 
 Run this conversation before any full run. Every answer maps to a field in
 `campaigns/local/<client>.json`, so the operator never edits JSON by hand.
-Ask one block at a time, in plain language, and confirm what you heard before
-moving on. Pull anything already known from earlier messages, the CSV, or
+Ask one block at a time, in plain language, and summarise what you heard when confirmation is needed. Pull anything already known from earlier messages, the CSV, or
 existing campaigns instead of asking again.
 
 ## 1. The list
 
-- Confirm the CSV path and run `--validate-only` style checks mentally: does it
+- Confirm the CSV path and inspect the actual CSV headers: does it
   have email, first name, job title, company name, and a website or domain?
 - Ask who the list is for: the operator's own agency or a client. The client
   name becomes `client_name`; the sender name becomes `sender.name`.
@@ -76,8 +75,9 @@ run or quietly fall back to regex for the unprocessed list.
 
 ## 5. The email
 
-- Keep the body template from the example: greeting, personalised pitch,
-  approved offer line, approved CTA, sender name.
+- Keep the standard body template; `sequence.greeting: inline` joins the greeting
+  and opening. Draft approved follow-ups and plain sentence-style P.S. lines in
+  the campaign. Read writing-style.md before reviewing copy.
 - Choose `llm_focus.write_pitch: false` for approved direct-pitch templates
   filled with company and buyer slots, or `true` for a factual model opening.
   Agree any quantities and prospect-dependent claim variants; example figures
@@ -96,4 +96,4 @@ Only after the operator has approved the target description, the claims, the
 offer line, the CTA, and the sample emails, change `status` to `approved` and
 run the full list. Record the approval in the conversation.
 
-When follow-ups are requested, reuse this confirmed brief with cold-email-generator via `sequences.md`. Preserve approved first-email copy and review complete follow-up previews before sending-platform setup.
+Draft the complete sequence from this brief using `sequences.md`. Keep fees, claims and asset quantities campaign-specific. New campaigns use conversational defaults unless overridden. Read complete sequence previews before approval; do not re-interview for details already given.

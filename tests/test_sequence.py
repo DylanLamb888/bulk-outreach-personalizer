@@ -142,6 +142,13 @@ class SequenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unapproved"):
             validate_sequence(self.config.data)
 
+    def test_direct_validation_rejects_null_sequence(self):
+        from bulk_enrich.config import validate_campaign_data, CampaignConfigError
+
+        self.config.data["sequence"] = None
+        with self.assertRaises(CampaignConfigError):
+            validate_campaign_data(self.config.data)
+
     def test_legacy_configuration_unchanged(self):
         del self.config.data["sequence"]
         self.assertEqual(

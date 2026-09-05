@@ -1127,6 +1127,12 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
         )
 
 
+    from bulk_enrich.sequence import validate_sequence
+    try:
+        validate_sequence(data)
+    except ValueError as exc:
+        raise CampaignConfigError(str(exc)) from exc
+
 def load_campaign(path: str | Path) -> CampaignConfig:
     campaign_path = Path(path).expanduser().resolve()
     if not campaign_path.is_file():
@@ -1139,9 +1145,5 @@ def load_campaign(path: str | Path) -> CampaignConfig:
         raise CampaignConfigError(f"invalid JSON in {campaign_path}: {exc}") from exc
 
     validate_campaign_data(data)
-    from bulk_enrich.sequence import validate_sequence
-    try:
-        validate_sequence(data)
-    except ValueError as exc:
-        raise CampaignConfigError(str(exc)) from exc
+
     return CampaignConfig(path=campaign_path, data=data)

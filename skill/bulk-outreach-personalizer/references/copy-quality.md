@@ -10,7 +10,7 @@ Use website facts inside the commercial question or offer. Do not lead with a se
 - Use `{{buyer_phrase}}` when the offer depends on reaching prospective buyers; use `{{company_focus}}` when the offer genuinely needs the category itself.
 - Keep a focus to roughly seven words and a pitch to roughly 8–14 words.
 - Prefer concrete people and actions over abstract labels. For example, use "companies looking to sell a division" instead of "corporate teams considering a carve-out".
-- Reject dates, heritage claims, “& more”, promotional adjectives, comma-separated catalogues, and stacked USPs from send copy.
+- Reject dates, heritage claims, “& more”, promotional adjectives, long catalogues, and stacked USPs from send copy.
 - Do not copy more than the configured number of consecutive words from the source evidence.
 - Give each signal type an appropriate commercial angle. Surface-level synonym rotation is not a substitute for angle routing.
 - Keep market-specific buyer categories in the campaign's focus-rule CSV. Never make one campaign's niche terminology a global engine rule.
@@ -33,6 +33,15 @@ Use website facts inside the commercial question or offer. Do not lead with a se
 - Put overused openings and client-specific exclusions in `banned_phrases`.
 - Keep multiple approved sentence structures per common angle. Select them deterministically by domain and monitor opening frequency across the batch.
 - Do not place several contacts from the same company in one ready file. Keep the strongest contact ready and hold the rest for later waves.
+
+## Complete sequence review
+
+Review the generated `.copy-review.csv` for every distinct service/buyer/template
+combination and `.previews.md` for full sequence flow. Preserve evidence while
+applying justified exact replacements in campaign settings, then use render-only.
+Full body limits include signatures and P.S.; repetition metrics continue to
+measure selling copy, not shared opt-out language. Check the distinction between
+prospects and customers and avoid suggesting an existing relationship.
 
 ## Batch gate
 

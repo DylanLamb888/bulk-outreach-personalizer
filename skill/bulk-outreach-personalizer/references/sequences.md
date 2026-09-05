@@ -1,31 +1,71 @@
-# Sequences with cold-email-generator
+# Complete sequences and repeatable delivery
 
-Use the installed `cold-email-generator` skill to draft campaign-level sequences when the operator wants follow-ups. This is an assistant workflow, not an automatic call from the Python CLI.
+## One approved campaign
 
-## Share one brief
+Draft first-email angles and all follow-ups together from the confirmed brief.
+Read the installed cold-email-generator writing rules, but do not import another
+client's commercial terms or assume a generic example format overrides the user.
+Every follow-up should advance the conversation: targeting/detail, practical
+approach, then a short nudge or relevant ownership question. A/B alternatives
+belong within steps 2 and 3, not four consecutive messages.
 
-Reuse the offer, audience, sender, approved claims, commercial terms, CTA, exclusions, and copy preferences already confirmed in the conversation and campaign. Explicitly having no proof is a complete answer; do not ask for it again or invent it. Read the generator's `references/WRITING_RULES.md` on each invocation and its relevant examples for new sequences. Keep those references as the writing source of truth instead of copying their rules here.
+Configure `sequence.followups` using `followup_2a`, `followup_2b`, `followup_3a`,
+`followup_3b`. Templates contain body text only; the engine adds the sender and
+one P.S. Literal commercial claims must be approved in `offer.approved_claims`;
+selected approved CTA/offer sentences can also be reused. The engine checks every
+rendered message, including the first email. Avoid pricing repetition in follow-ups.
 
-If email 1 is already approved, retain it and draft only the requested follow-ups. For a new sequence, use the generator's sequence format. User-approved style takes precedence over generic examples. Never say an asset was already prepared unless it exists.
+Use internal fields `company_focus`, `buyer_phrase`, `company_name`,
+`company_short_name`, `first_name`, `cta` and `risk_reversal`. The renderer provides
+these from validated research and approved campaign variants. Exported research
+fields have different names (`personalization_focus`, `personalization_buyer_phrase`).
+Do not put those names into internal templates.
 
-## Reuse company research
+Optional `neutral_followups` must contain all four alternatives and may be used
+only when required personalized fields are missing. They never grant company
+eligibility. `greeting` is `inline` by default, or `paragraph`. Inline mode expects
+the standard `Hi {{first_name}},\n\n{{personalized_pitch}}` campaign body prefix
+(using the configured pitch field); only safe sentence starters are lowercased.
+`ps_variants` contains literal one-line opt-out sentences beginning `p.s. `.
+The stable company/message assignment never stacks P.S. lines on a rerun.
+Use enough approved variants for variety without forced synonym spinning.
 
-Draft shared templates once, with fields populated from the existing ready CSV:
+`max_followup_words` defaults to 55 including signature/P.S. First email uses
+`quality.max_body_words`, also including P.S. Keep it shorter where practical;
+do not silently relax limits to force rows through.
 
-| Template field | CSV source |
-| --- | --- |
-| `{{company_name}}` | Map the original company-name column to the sending tool's company field |
-| `{{personalization_focus}}` | Agency service or company commercial focus |
-| `{{personalization_buyer_phrase}}` | Businesses or people buying that service |
+## Standard commands
 
-The Python campaign renderer uses `{{company_focus}}` and `{{buyer_phrase}}` internally. Those names differ from the exported fields above; do not mix them in the handoff. Preserve lowercase slot values when the operator prefers them.
+```bash
+python3 <repository>/scripts/enrich.py --input leads.csv --campaign campaigns/local/client.json --output outputs/client/audit.csv --review-output outputs/client/review.csv --smartlead-output outputs/client/smartlead.csv
+python3 <repository>/scripts/enrich.py --render-only --input outputs/client/audit.csv --campaign campaigns/local/client.json --output outputs/client/revised-audit.csv --smartlead-output outputs/client/revised-smartlead.csv
+```
 
-Draft email 2 variants A/B and email 3 variants A/B as alternatives within their respective steps, not four consecutive follow-ups. Follow-ups are body-only. Explain proposed timing separately; scheduling and reply-stop behavior must be checked in the sending platform before launch.
+Add `--allow-test-campaign` for controlled samples. Keep the audit's
+`.render-state.json` sidecar. Render-only uses no network/model calls and does not
+need a provider preflight. It rejects changed targeting, claims, classification
+limits, fallback policy or research rule files. Run normal enrichment when those
+change; unchanged requests still use the existing model cache.
 
-## Review and handoff
+## Copy corrections and review
 
-Save campaign-specific drafts in ignored `outputs/<campaign>/sequence-draft.md`. Render each variant against actual ready rows locally, check missing fields, word counts, unsupported claims, and awkward slot grammar, and show complete examples to the operator. No new website or per-company model calls are needed to reuse existing fields.
+Exact `sequence.editorial_replacements` map a service or buyer phrase to
+`{"text": "approved wording", "reason": "why this correction is supported"}`.
+Domain-keyed `company_name_overrides` use the same shape. Correct known branding
+from evidence; do not blindly strip punctuation from proper names. Neither map
+modifies original source fields or quotes. Use examples/brief changes and fresh
+classification for substantive changes that cannot be justified editorially.
 
-The current CLI renders only email 1. It does not automatically export follow-up columns, validate follow-up bodies, upload a sequence, or schedule messages. A row's `ready` status applies to its generated first email; it does not approve newly drafted follow-ups. Hand over the approved shared follow-up templates alongside the ready CSV and verify imported-field previews before launch. Never upload, launch, or send without explicit authorization.
+Read every distinct combination in `.copy-review.csv` and complete sequences in
+`.previews.md`. Record editorial review separately with the upload's SHA-256.
+Check source relevance, sentence joins and whether follow-ups add anything.
+Automated checks cannot certify persuasive writing. True exceptions remain held.
 
-Before scaling, check whether the manifest sample-quality assessment was evaluated. Its minimum counts rendered company emails, not input rows: a 20-row sample with fetch failures or exclusions may not exercise the repetition gate. Report this explicitly.
+## Smartlead handoff
+
+Use the compact CSV's existing column names and generated `.mapping.md`.
+Map email 1 subject/body to `{{personalized_subject}}` / `{{personalized_email}}`;
+map follow-up bodies to their exact exported column names. Do not add another
+signature or P.S. Review live paragraph breaks, sequencing, timing, stop-on-reply
+and opt-out suppression before launch. The file does not configure these settings
+and no upload/send is implied by approval of the copy.

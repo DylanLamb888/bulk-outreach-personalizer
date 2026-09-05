@@ -98,3 +98,20 @@ validation and compact `--smartlead-output` bundles. `--render-only` replays new
 audit sidecars offline and refuses changes to research/qualification inputs.
 Legacy campaigns retain first-email behaviour. Automated QA, editorial review
 and platform verification have separate statuses. No platform mutation occurs.
+
+### Replacement skill acceptance (2026-09-05)
+
+The shared Codex/Claude skill now covers briefing through complete sequence
+review and delivery. New campaign scaffolds include overridable conversational
+sequence defaults; no approved proof claims is valid. The standalone cold email
+generator is unchanged. A fresh synthetic campaign uses only the standard CLI,
+with fake site results and real model binaries/network prohibited. Live model
+execution, Smartlead preview, upload, sending and unsubscribe handling are not
+verified or configured by this acceptance check.
+
+Acceptance: 180 unittest tests passed on Python 3.12.13 and Python 3.14.6;
+`ruff check src tests --select F,E9` and skill validation passed. Both installed
+links resolve to the repository-owned replacement. A five-company synthetic
+campaign through the installed skill's resolved CLI path produced five complete
+sequence rows, with no model calls or live website access. Real-list ready-row
+impact was not measured; newly unsafe/incomplete sequences are held explicitly.

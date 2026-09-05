@@ -456,7 +456,7 @@ Progress is reported per unique company domain. Duplicate domains reuse the same
 
 ## Outputs
 
-For follow-up sequences, pair the personalizer with the installed `cold-email-generator` skill using the same confirmed brief. It drafts shared follow-up templates that reuse the ready CSV's service and buyer fields, without additional company model calls. See [the sequence workflow](skill/bulk-outreach-personalizer/references/sequences.md). The CLI currently exports email 1 only; follow-up approval and scheduling remain separate.
+For follow-up sequences, pair the personalizer with the installed `cold-email-generator` skill using the same confirmed brief. It drafts shared follow-up templates that reuse the ready CSV's service and buyer fields, without additional company model calls. See [the sequence workflow](skill/bulk-outreach-personalizer/references/sequences.md). The CLI exports full sequences when `sequence` is configured; follow-up approval and platform scheduling remain separate.
 
 ### CSV files
 

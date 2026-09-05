@@ -23,3 +23,12 @@ Keep commercial claims, neutral pitch variants, eligibility thresholds and follo
 Account for every input row exactly once as included or held. Check unique emails and company-contact policy, complete bodies, unresolved placeholders, banned wording, length and repetition. Review examples from each recovery mode. Preserve source fields and verbatim quotations when making editorial substitutions in generated copy.
 
 Deliver an import CSV, held-exceptions CSV and full disposition ledger. Report how many original ready rows were preserved, how many were recovered, and which use source-list personalisation or neutral copy. Include first-email and follow-up variants where requested. A/B follow-ups are alternatives within each step. Preparing an import is not permission to upload, schedule or send it.
+
+For audits produced by the current engine, fix sequence-only failures in the
+campaign and use `--render-only` with the saved audit sidecar. This can restore a
+row held only by a sequence failure without repeating research. It cannot change
+company eligibility. Missing/ambiguous evidence still needs the staged assessment
+above; do not edit an audit/sidecar to bypass the classification fingerprint.
+Use `--smartlead-output` for the native delivery bundle instead of writing a new
+CSV packaging script. Historical, manually recovered deliveries remain archived;
+they are not evidence that fresh classification can be skipped.

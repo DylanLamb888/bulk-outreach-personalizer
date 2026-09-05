@@ -144,3 +144,8 @@ Use `--render-only --input <audit.csv> --output <new-audit.csv>` with the campai
 and saved `.render-state.json` sidecar for copy revisions without model calls.
 Classification/targeting changes are rejected; do not bypass this by editing
 saved audit or sidecar data. Existing pre-sidecar audits require a normal run.
+
+An empty `offer.approved_claims` array explicitly means no approved proof or
+quantitative promises. Do not manufacture a claim to satisfy configuration.
+Literal unapproved promises and banned wording in sequence templates fail during
+campaign validation; merge-dependent sentences are checked after rendering.
