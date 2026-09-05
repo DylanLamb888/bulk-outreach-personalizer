@@ -119,3 +119,5 @@ A persistent subscription rate limit stops the run before new output CSVs or a m
 Codex live execution is untested as of 2026-09-04 because the installed CLI cannot start. Its current parser returns zero token fields, which means unavailable telemetry, not a measured free run. Do not use those zeros to validate a Codex budget. The failed local startup check made no model calls.
 
 URL-only page digests are not sent for model classification. They contain no readable company evidence; existing fallback and qualification gates still apply.
+
+Assistant-led upload recovery can produce a separate import and disposition ledger; it does not change the original CLI audit statuses. Keep original-ready, source-list personalisation, neutral-offer recovery and held exceptions distinguishable. See `skill/bulk-outreach-personalizer/references/recovery.md`.

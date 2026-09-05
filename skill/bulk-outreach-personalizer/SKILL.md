@@ -49,3 +49,5 @@ Model openings with unapproved numeric or commercial promises fall back to appro
 If subscription throttling persists after the bounded retries, stop and tell the operator to wait for the reset before resuming. Do not disable the model or switch providers to bypass the limit. Completed chunks remain cached.
 
 Codex remains untested live: the local npm wrapper cannot start its missing native executable (checked 2026-09-04). A successful PATH lookup is not proof of provider readiness. Do not describe a Codex run as verified or free based on its current zero-valued usage fields.
+
+For recovery of viable prospects blocked by evidence or copy failures, follow `references/recovery.md`. Keep targeting exceptions separate from copy failures and preserve the original audit.
