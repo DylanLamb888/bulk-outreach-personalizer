@@ -19,6 +19,14 @@ class CampaignConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(CampaignConfigError, "migrate.*schema 3.0"):
                 load_campaign(path)
 
+    def test_explicitly_no_approved_claims_is_valid(self) -> None:
+        payload = json.loads((ROOT / "campaigns" / "campaign-template.json").read_text())
+        payload["offer"]["approved_claims"] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "no-proof.json"
+            path.write_text(json.dumps(payload))
+            self.assertEqual(load_campaign(path).data["offer"]["approved_claims"], [])
+
     def test_campaign_template_is_valid(self) -> None:
         config = load_campaign(ROOT / "campaigns" / "campaign-template.json")
         self.assertEqual(config.campaign_id, "replace-me")

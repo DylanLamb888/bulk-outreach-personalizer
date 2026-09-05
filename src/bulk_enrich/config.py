@@ -662,7 +662,7 @@ def validate_campaign_data(data: dict[str, Any]) -> None:
             "offer.risk_reversal_variants must include at least one '*' focus-rule fallback"
         )
     for list_key in ("approved_claims", "forbidden_claims"):
-        _require_string_list(offer, list_key, label=f"offer.{list_key}")
+        _require_string_list(offer, list_key, label=f"offer.{list_key}", allow_empty=list_key == "approved_claims")
 
     personalization = _require_mapping(data, "personalization")
     _require_nonempty_string(
