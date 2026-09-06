@@ -8,7 +8,7 @@
 
 First emails, follow-ups and a Smartlead import — built from one brief, with company evidence behind the copy.
 
-[![CI workflow](https://img.shields.io/badge/CI-test_workflow-22364a?style=flat-square)](https://github.com/DylanLamb888/bulk-enrich/actions/workflows/tests.yml) ![Python](https://img.shields.io/badge/Python-3.11%2B-22364a?style=flat-square) ![Version](https://img.shields.io/badge/version-0.13.0-22364a?style=flat-square) ![Shared skill](https://img.shields.io/badge/Codex_%2B_Claude-shared_skill-b99a5e?style=flat-square)
+[![CI workflow](https://img.shields.io/badge/CI-test_workflow-22364a?style=flat-square)](https://github.com/DylanLamb888/bulk-outreach-personalizer/actions/workflows/tests.yml) ![Python](https://img.shields.io/badge/Python-3.11%2B-22364a?style=flat-square) ![Version](https://img.shields.io/badge/version-0.13.0-22364a?style=flat-square) ![Shared skill](https://img.shields.io/badge/Codex_%2B_Claude-shared_skill-b99a5e?style=flat-square)
 
 [Get started](#get-started) · [The workflow](#the-workflow) · [What you get](#what-you-get) · [Documentation](#documentation)
 
@@ -66,8 +66,8 @@ You need **Python 3.11+**, a lead CSV and a signed-in provider CLI for model-ena
 ### 1. Install the shared skill
 
 ```bash
-git clone https://github.com/DylanLamb888/bulk-enrich.git
-cd bulk-enrich
+git clone https://github.com/DylanLamb888/bulk-outreach-personalizer.git
+cd bulk-outreach-personalizer
 python3 scripts/install_skill.py --target both
 ```
 
