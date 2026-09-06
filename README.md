@@ -456,7 +456,7 @@ Progress is reported per unique company domain. Duplicate domains reuse the same
 
 ## Outputs
 
-For follow-up sequences, pair the personalizer with the installed `cold-email-generator` skill using the same confirmed brief. It drafts shared follow-up templates that reuse the ready CSV's service and buyer fields, without additional company model calls. See [the sequence workflow](skill/bulk-outreach-personalizer/references/sequences.md). The CLI exports full sequences when `sequence` is configured; follow-up approval and platform scheduling remain separate.
+For follow-up sequences, use the personalizer's [writing defaults](skill/bulk-outreach-personalizer/references/writing-style.md) and [sequence workflow](skill/bulk-outreach-personalizer/references/sequences.md) with the confirmed brief. Standalone `cold-email-generator` examples are optional inspiration; campaign choices govern the copy. The CLI renders and validates configured follow-ups without additional company model calls. Follow-up approval and platform scheduling remain separate.
 
 ### CSV files
 
@@ -798,6 +798,12 @@ makes no research or model calls. Targeting or classification changes require
 fresh enrichment. The delivery includes held exceptions, a disposition ledger,
 copy review queue, complete previews, mapping instructions and a manifest.
 Editorial review and live Smartlead preview remain separate from automated QA.
+
+Copy-only requests start with the current campaign and genuine audit sidecar;
+they do not restart the interview or provider preflight. New scaffolds use the
+three priority/plans/company-relevance P.S. variations in the writing reference
+and a "Who handles…" referral breakup, all overridable per campaign. A legacy
+upload without saved qualification state cannot be relabelled as an offline replay.
 
 
 ## One offer across the sequence

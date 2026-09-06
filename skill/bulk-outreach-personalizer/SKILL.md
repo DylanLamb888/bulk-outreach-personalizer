@@ -1,82 +1,85 @@
 ---
 name: bulk-outreach-personalizer
-description: Turn a lead CSV and a confirmed campaign brief into researched first emails, follow-up alternatives and an audited Smartlead import. Use for bulk cold outreach campaign setup, copy revisions or review of held prospects. Uses cached company research through local subscription CLI logins; does not upload or send.
+description: Build or revise researched cold-email CSV campaigns with complete sequences and audited Smartlead delivery files. Use for campaign setup, bulk copy revisions and held-prospect review; standalone email writing does not need this workflow.
 ---
 
 # Bulk Outreach Personalizer
 
-One conversation, one campaign JSON, one lead CSV. Use the existing engine for
-research and rendering; do not invent a campaign-specific CSV patching script.
-Resolve this file's real path through any symlink, then go up two directories
-to the repository. Run `<repository>/scripts/enrich.py` from any working directory.
+One conversation, one campaign JSON, one lead CSV. Use the existing engine;
+keep reusable corrections in campaign data, not campaign-specific CSV scripts.
+Resolve the installed skill directory through its symlink. Its parent's parent
+is the repository; run `<repository>/scripts/enrich.py` with explicit file paths.
 
-## Brief → research → sample → approval → run → review → delivery
+## Choose the work already requested
 
-1. **Recover the brief.** Read the supplied CSV, existing campaign and conversation.
-   Ask only for missing offer, audience, sender, approved claims, commercial terms,
-   CTA or exclusions. Explicitly having no proof is complete. Use
-   [interview.md](references/interview.md); the operator should not edit JSON.
-2. **Read the market.** Use `--digest-only` on 20–40 sample rows before proposing
-   targeting. Explain core fit, exceptions and examples in plain language.
-   Do not infer prospect buying intent from service descriptions.
-3. **Write one campaign.** Copy the repository campaign template into ignored
-   `campaigns/local/`. Draft the whole sequence in its optional `sequence` object.
-   For copy, read [writing-style.md](references/writing-style.md) and use the
-   installed cold-email-generator's writing rules with the confirmed brief.
-   User preferences override its generic formats. Standalone cold-email-generator
-   remains available; do not modify or replace it.
-4. **Preflight and sample.** Use `--validate-only`. Default to `claude-code`,
-   `claude-opus-5`, low effort, five companies per call and the existing nominal
-   usage guard. Explain nominal usage as a subscription usage estimate, not an API
-   bill. Agree the run budget. Generate 20–50 sample rows with
-   `--allow-test-campaign` and `--smartlead-output`; show complete first emails
-   and both alternatives for each follow-up step. Do not call a sample validated
-   if too few rendered companies exercised the repetition gate.
-5. **Approve, then run.** Reuse approval already given for the brief, target,
-   claims and sequence. Otherwise obtain it from the complete sample, then set
-   campaign status to `approved`. Run audit, review and Smartlead outputs with the
-   same script. Only one strongest eligible contact per company enters delivery.
-6. **Review the actual writing.** Read every distinct service/buyer/template
-   combination in the generated `.copy-review.csv`, then complete `.previews.md`
-   sequences covering every template and neutral/evidence mode. Check relevance,
-   grammatical joins, progression and factual meaning, not just word counts.
-   Correct templates or exact editorial replacements in the campaign and use
-   `--render-only` to rebuild; do not patch the export. Keep evidence untouched.
-7. **Hand over precisely.** Report included and held counts, actual model usage,
-   automation checks, editorial review and platform verification separately.
-   Save a human-readable editorial review with the reviewed upload SHA-256 and
-   remaining concerns. The generated manifest's initial `editorial_review: pending`
-   must not be described as completed. Provide the import CSV, held exceptions,
-   disposition ledger, previews and mapping guide. Upload/send requires separate
-   authorization; a P.S. does not configure unsubscribe processing.
+- **New campaign or changed targeting:** use [interview.md](references/interview.md).
+  Recover known answers, inspect the CSV, research a representative sample,
+  agree targeting and draft the complete sequence before the full run.
+- **Copy revision:** use [sequences.md](references/sequences.md). Read the current
+  campaign and audit, then use `--render-only` with its genuine sidecar. Skip
+  the interview, website fetching and provider preflight when research inputs
+  are unchanged. Missing sidecars require the recovery path in that reference.
+- **Held prospects:** use [recovery.md](references/recovery.md). Distinguish
+  copy defects from targeting or contact exceptions before changing anything.
 
-## Copy and delivery defaults
+Read [writing-style.md](references/writing-style.md) when writing or reviewing
+copy, [copy-quality.md](references/copy-quality.md) for batch review, and
+[usage.md](references/usage.md) for field/output details when needed.
 
-New campaigns start with `Hi {{first_name}} - ...`, ordinary sentences and short
-paragraphs. Follow-ups remain direct replies without repeated greetings. Use
-natural sentence-style opt-outs after the first-email sender (`ps_scope: first_only`),
-not advertising-style questions. Keep one approved offer across the sequence,
-using different buyer and commercial angles rather than repeating process details.
-Keep these choices overridable per campaign. Fees, quantities, claims and service
-language always come from that campaign, never a previous client's example.
+## Authority and decisions
 
-Read [sequences.md](references/sequences.md) for configuration and command usage,
-[copy-quality.md](references/copy-quality.md) for quality checks and
-[recovery.md](references/recovery.md) when viable prospects have been held.
-Full field and output contracts are in [usage.md](references/usage.md).
+The user's current instructions and approved campaign choices take precedence
+over generic skill examples and writing formulas. An explicitly confirmed lack
+of proof is a complete answer. Fees, payment conditions, claims, quantities and
+asset availability come from this campaign's brief; never infer them from an old
+client, project instruction or persuasive example. Surface conflicting facts
+that affect the offer rather than silently choosing one.
 
-## Preserve the engine's boundaries
+This skill's writing reference is sufficient for bulk copy. If the installed
+cold-email-generator references offer useful examples, read only the relevant
+parts as inspiration. Their fixed subjects, variant counts and proof requirements
+do not govern this workflow. Keep that standalone skill unchanged.
 
-- Cache one decision per unique company and batch several companies per call.
-  Never dispatch an agent or make a model call per lead. Follow-ups and copy-only
-  revisions reuse research without model calls.
-- Use local Claude/Codex CLI subscription logins. No API keys in this workflow.
-  Preserve model defaults, expensive-model refusal and usage guards. Codex was
-  last reported untested live; do not claim fresh verification without running it.
-- Evidence must be substantive and relevant, not merely present on a page.
-  Keep evidence gates, contact/email qualification, checkpointing and rate-limit
-  stops intact. Do not bypass a subscription throttle by switching providers.
-- A held company is not made eligible by a fluent template. Neutral copy requires
-  established eligibility and approved campaign fallback settings. Preserve all
-  targeting exceptions and distinguish source-list evidence from website evidence.
-- Tests use fake runners or classifiers. A live model sample needs authorization.
+Reuse authorization already given. Complete authorized local edits, checks and
+repairs without asking after each step. Ask only for missing decisions that
+materially change the campaign or permissions. Prepare complete samples before
+requesting approval for the full run. If an instruction blocks progress, link
+the exact file and explain the requirement and the remaining decision.
+
+## Run and finish
+
+For a new researched run, use `--validate-only`, agree the nominal usage budget,
+and produce a controlled 20–50-row sample with `--allow-test-campaign`. Reuse an
+existing budget approval within its scope. Nominal USD estimates subscription
+usage; it is not an API bill. Show complete first emails and both alternatives
+for each follow-up step. Do not call a sample validated if too few rendered
+companies exercised the repetition gate. On sequence/target approval, set the
+campaign to `approved` and run the same CLI with `--smartlead-output`.
+
+Read every distinct service/buyer/template combination in `.copy-review.csv`
+and complete `.previews.md` sequences covering each template and fallback mode.
+Fix awkward joins in campaign templates or justified editorial replacements,
+then render again. Preserve subjects, message roles and other approved copy
+outside the requested edit. Recheck affected messages and complete-sequence
+gates; do not restart research for a wording correction.
+
+Completion means the requested copy is corrected and checked, and the import,
+held exceptions, disposition ledger, previews, mapping guide and manifest are
+delivered. Record editorial review with the final upload SHA-256 and unresolved
+concerns. Report automated checks, editorial judgment and platform verification
+separately. If blocked, preserve completed work and explain what remains.
+Uploading, sending and configuring opt-out handling require their own authority;
+a P.S. does not configure suppression.
+
+## Engine boundaries
+
+- Use subscription CLI logins. Default to `claude-code`, `claude-opus-5`, low
+  effort and five companies per call. Keep model/usage guards and checkpointing.
+  No API keys, per-lead agents or per-row model calls in this workflow.
+- Cache one model decision per unique domain. Follow-ups and presentation-only
+  revisions reuse research. Never bypass throttle stops by switching providers.
+- Preserve source evidence, qualification and genuine exceptions. Fluent neutral
+  copy does not establish eligibility; fallback needs approved campaign policy.
+- Tests use fake runners or classifiers. Run relevant checks and the repository's
+  required suites for engine/test changes. Live samples spend subscription usage
+  and need authorization. Report only provider execution actually verified.

@@ -121,14 +121,17 @@ Subscription throttling is retried at most three times, after 5, 15, and 30 seco
 
 Codex live status (2026-09-04): untested. The installed `/opt/homebrew/bin/codex` npm wrapper fails with `ENOENT` because its native executable is missing. Version, help, and login-status checks never reached the CLI; no five-domain test ran and no model usage occurred. Fake-runner tests cover transport behavior, not live authentication or model compatibility. Keep the default Claude Code provider for now.
 
-For shared follow-ups using existing exported company fields, follow `sequences.md` and the installed cold-email-generator skill. Follow-up templates are separate draft artifacts; the CLI does not render or validate them.
+For shared follow-ups, use `sequences.md` and `writing-style.md`. The CLI renders
+and validates configured sequence templates from the same company information.
+Standalone cold-email examples are optional inspiration; approved campaign
+decisions govern subjects, message roles and proof requirements.
 
 ### Sequence configuration
 
 The optional `sequence` object holds four `followups` body templates and optional
 `neutral_followups` under `followup_2a`, `followup_2b`, `followup_3a`, `followup_3b`.
 Use internal merge fields `company_focus`, `buyer_phrase`, `company_name`,
-`company_short_name`, `first_name`, `sender_name`, `cta`, and `risk_reversal`.
+`company_short_name`, `first_name`, `cta`, and `risk_reversal`.
 Do not add a signature or P.S. inside follow-up templates. The renderer appends
 them. Set `greeting` to `inline` (default) or `paragraph`, `ps_variants` to approved
 literal lines starting `p.s. `, and `max_followup_words` (default 55). First-email

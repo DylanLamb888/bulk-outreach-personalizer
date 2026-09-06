@@ -116,7 +116,6 @@
       "saw that",
       "i noticed",
       "i came across",
-      "quick question",
       "just following up",
       "i'll cut the fluff",
       "2 things // checking in"
@@ -289,12 +288,12 @@
       "followup_2a": "{{cta}}",
       "followup_2b": "{{cta}}",
       "followup_3a": "Would that be useful for you?",
-      "followup_3b": "Who would be the right person at {{company_short_name}} to speak to about this?"
+      "followup_3b": "Who handles this at {{company_short_name}}?"
     },
     "ps_variants": [
-      "p.s. if this isn\u2019t something you\u2019re interested in, just reply \"no thanks\" and I\u2019ll take you off my list.",
-      "p.s. if you\u2019d rather I didn\u2019t email you again, just reply \"no thanks\" and I\u2019ll take you off my list.",
-      "p.s. if this isn\u2019t relevant to you, just reply \"no thanks\" and I\u2019ll take you off my list."
+      "p.s. if this isn\u2019t a priority right now, reply \"no thanks\" and I\u2019ll take you off my list.",
+      "p.s. if this doesn\u2019t fit your plans, reply \"no thanks\" and I\u2019ll take you off my list.",
+      "p.s. if this isn\u2019t relevant to your company, reply \"no thanks\" and I\u2019ll take you off my list."
     ],
     "editorial_replacements": {},
     "company_name_overrides": {},

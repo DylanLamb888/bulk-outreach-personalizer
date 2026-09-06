@@ -1,6 +1,6 @@
 # Deterministic copy quality
 
-Use website facts inside the commercial question or offer. Do not lead with a separate research announcement such as “Saw that”, “I noticed”, or “I came across”. Accurate observation plus generic pitch is still mail merge.
+For the default direct-pitch mode, use website facts inside the commercial question or offer rather than a separate research announcement. Campaign-approved factual openings may use a different structure. Apply these writing defaults within the confirmed brief; explicit user choices override generic formulas.
 
 ## Campaign copy rules
 
@@ -22,8 +22,8 @@ Use website facts inside the commercial question or offer. Do not lead with a se
 - Scope CTAs to campaign focus rules when the promised asset uses buyer-specific language.
 - Do not use em dashes in configured or rendered outreach copy.
 - Never offer to show the opening line after the email has already displayed it. Each CTA must offer a distinct, deliverable next asset.
-- Clean provider-added middle initials from greetings and legal suffixes, parentheticals, separators, or dangling connectors from subject-line company names.
-- Prefer the most specific configured focus rule supported by first-party evidence. Use CSV fallback only when website evidence is unavailable, require the approved number of fields to agree on the same rule, and keep the result review-only. A company name may corroborate another approved field but must never qualify alone.
+- Review provider-added name clutter in sentence context. Preserve proper names; make justified company-name corrections through campaign overrides rather than blindly stripping punctuation or words.
+- Prefer the most specific configured focus rule supported by first-party evidence. Use CSV fallback only under the campaign's explicit qualification policy, preserving its provenance and disposition. A company name may corroborate another approved field but must never qualify alone.
 - Do not repeat the same opening structure in the personalized pitch and CTA within one email.
 - Prefer low-friction, value-based CTAs that offer something specific. Do not ask for a call unless the campaign explicitly requires that CTA.
 - Include only client-approved claims. Never infer prospect intent, pain, growth plans, sale intent, performance, or customer relationships.

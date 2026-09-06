@@ -165,6 +165,13 @@ classification limits, fallback policy, focus rules or title hooks require a new
 enrichment run. Modified audits and legacy audits without a sidecar cannot be
 replayed. Source evidence remains unchanged; outputs must use distinct paths.
 
+For a copy-only revision, report which fields changed and preserve other approved
+messages and dispositions. New scaffolds use priority/plans/company-relevance
+P.S. wording in email one and a "Who handles…" step-3B referral; these are campaign
+defaults, not eligibility gates. An upload CSV alone cannot reconstruct saved
+qualification. Preserve legacy deliveries and establish a genuine audit before
+claiming standard offline replay.
+
 
 ## One offer across the sequence
 

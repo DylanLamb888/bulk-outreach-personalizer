@@ -3,11 +3,13 @@
 ## One approved campaign
 
 Draft first-email angles and all follow-ups together from the confirmed brief.
-Read the installed cold-email-generator writing rules, but do not import another
-client's commercial terms or assume a generic example format overrides the user.
+Use [writing-style.md](writing-style.md) for bulk copy. Optional standalone
+cold-email examples supply inspiration, not mandatory formats or commercial terms.
 Every follow-up should advance the conversation: a relevant buyer angle, then a short direct offer to send the same asset. Avoid
 process explanations when the approved angle is new-business opportunity. A/B alternatives
 belong within steps 2 and 3, not four consecutive messages.
+Preserve each approved message's role during revisions: step 3A offers the asset;
+step 3B asks who handles the relevant function, including in neutral alternatives.
 
 Configure `sequence.followups` using `followup_2a`, `followup_2b`, `followup_3a`,
 `followup_3b`. Templates contain body text only; the engine adds the sender and
@@ -46,6 +48,17 @@ Add `--allow-test-campaign` for controlled samples. Keep the audit's
 need a provider preflight. It rejects changed targeting, claims, classification
 limits, fallback policy or research rule files. Run normal enrichment when those
 change; unchanged requests still use the existing model cache.
+
+### Missing or incompatible saved state
+
+First look for the original audit and matching sidecar in the delivery bundle.
+An upload CSV or saved editorial context is not a qualification record. Preserve
+legacy deliveries without claiming offline replay or manufacturing a sidecar.
+Prepare campaign edits and validation locally; if genuine state cannot be found,
+explain that a normal enrichment run is needed and confirm any additional live
+usage not already authorized. Do not quietly fetch websites or call a provider
+to complete a copy-only request. If classification inputs changed, use the same
+normal-run path rather than weakening the fingerprint check.
 
 ## Copy corrections and review
 

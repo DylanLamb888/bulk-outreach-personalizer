@@ -88,7 +88,10 @@ The engine can later accept optional API-backed fetch adapters without changing 
 
 Codex live status (2026-09-04): untested. The installed `/opt/homebrew/bin/codex` npm wrapper fails with `ENOENT` because its native executable is missing. Version, help, and login-status checks never reached the CLI; no five-domain test ran and no model usage occurred. Fake-runner tests cover transport behavior, not live authentication or model compatibility. Keep the default Claude Code provider for now.
 
-Sequence composition is supported as an assistant workflow with the installed cold-email-generator skill. It produces shared follow-up templates from the confirmed brief and previews existing ready-row fields. Automatic follow-up CSV generation, validation, scheduling, and uploads are not implemented.
+The CLI renders and validates configured follow-up sequences from the confirmed
+campaign and saved company information. Bulk writing guidance lives in the shared
+skill; standalone cold-email-generator examples are optional. Platform scheduling
+and uploads are not implemented by the engine.
 
 ## Complete sequence delivery
 
@@ -124,3 +127,26 @@ Keep one approved asset offer across the sequence and vary the reason to respond
 Set `sequence.ps_scope` to `first_only` for a P.S. in email one only. Omitting it preserves the legacy `all` behaviour. New campaign scaffolds use `first_only`. Follow-up signatures remain; length checks include any appended P.S. Use the standard `--render-only` command with a genuine audit sidecar for subsequent copy revisions. Historical CSVs without that sidecar must not be treated as requalified audits.
 
 Validation for the one-offer sequence update: 183 unittest cases pass on both required Python invocations; Ruff F/E9 and skill validation pass. Existing shared installation links remain valid. Tests use no live model calls. The legacy 1,409-row campaign delivery was revised with the same sequence renderer using saved editorial context, preserving eligibility, first emails and subjects; 5,636 follow-ups rendered without P.S. No upload or sending was performed.
+
+### Skill repair acceptance (2026-09-06)
+
+The shared skill routes new campaigns, copy-only revisions and held-prospect
+review separately. Current user/campaign choices govern generic writing rules;
+standalone cold-email-generator is optional inspiration and remains unchanged.
+New scaffolds use the approved priority/plans/company-relevance P.S. variants,
+first-email-only placement and a "Who handles…" breakup. The generic ban on
+"quick question" was removed so approved subject choices can pass validation.
+Existing campaign settings and deliveries were not edited.
+
+Both required unittest commands pass 184 cases (Python 3.12.13 and 3.14.6);
+Ruff F/E9 passes. The fresh-campaign test covers the scaffold subject and all
+exported follow-ups; a P.S.-only offline revision preserves other fields and
+repeats byte-for-byte. A five-company synthetic run resolved from the installed
+Codex skill produced five ready sequences and exercised all three P.S. variants.
+Both Codex/Claude links resolve to the same source. Structural skill validation
+and reference checks pass; these do not certify model routing or persuasive copy.
+
+No live model, website or Smartlead verification ran. No real-list ready-row
+reduction was measured or is expected from these defaults; qualification gates
+are unchanged. Legacy uploads still need a genuine audit/sidecar for offline
+replay; the repair documents recovery rather than fabricating that state.

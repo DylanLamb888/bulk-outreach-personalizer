@@ -839,6 +839,7 @@
         },
         "ps_variants": {
           "type": "array",
+          "description": "Campaign-approved opt-out sentences. New campaign scaffolds use priority, plans and company-relevance wording; wording remains overridable. Placement is controlled by ps_scope.",
           "uniqueItems": true,
           "items": {
             "type": "string",

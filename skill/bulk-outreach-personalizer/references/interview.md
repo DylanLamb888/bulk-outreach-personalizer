@@ -1,6 +1,7 @@
 # Campaign interview
 
-Run this conversation before any full run. Every answer maps to a field in
+Use this interview for new campaigns or missing targeting/offer decisions.
+Do not repeat it for an approved campaign's copy-only revision. Every answer maps to a field in
 `campaigns/local/<client>.json`, so the operator never edits JSON by hand.
 Ask one block at a time, in plain language, and summarise what you heard when confirmation is needed. Pull anything already known from earlier messages, the CSV, or
 existing campaigns instead of asking again.
@@ -14,7 +15,7 @@ existing campaigns instead of asking again.
 
 ## 2. The offer
 
-Ask, in this order:
+Ask only the unanswered questions that change the campaign:
 
 1. "What are you selling, in one sentence?" -> `offer.service`
 2. "Who buys it? Which roles, at what kind of company?" -> `offer.audience`
@@ -26,10 +27,11 @@ Ask, in this order:
 4. "How do you take the risk away? Pay per result, a guarantee, a small
    upfront fee?" -> `offer.risk_reversal` and two or three
    `offer.risk_reversal_variants` written as a colleague would say them.
-5. "What do you want them to reply to? Something you can send, not a call." ->
+5. "What do you want them to reply to?" ->
    `offer.cta` and three to six `offer.cta_variants` offering a concrete asset
-   such as a sample list, an outline, or examples. Only ask for a call if the
-   operator insists.
+   such as a sample list, an outline, or examples. Use a call CTA when the
+   operator requests it; a generic writing formula does not override that choice.
+   Confirm whether an offered asset exists before saying it is already prepared.
 6. "Anything you never want said?" -> `personalization.banned_phrases` and
    `offer.forbidden_claims`.
 
@@ -56,15 +58,15 @@ Ask, in this order:
 
 - Default `llm_focus.provider` is `claude-code`; use `codex` only if the
   operator says the run should use their ChatGPT subscription.
-- Codex is untested live on this machine (2026-09-04: missing native
-  executable). A PATH check alone does not verify login or execution.
-- Default `llm_focus.model` is `claude-opus-5` at `effort` `low`. Offer
-  `claude-sonnet-5` when the list is large and usage matters. Never set a
+- Consult the dated provider status in `docs/IMPLEMENTATION_STATUS.md` when
+  provider readiness matters. A PATH check alone does not verify execution.
+- Default `llm_focus.model` is `claude-opus-5` at `effort` `low`. Never set a
   Fable or Mythos model unless the operator explicitly asks and accepts that
   it drains usage several times faster; that also requires
   `allow_expensive_models: true`.
 - Show the `estimated_nominal_usd_for_list` figure from `--validate-only` and
-  agree a `max_nominal_usd` per run. Explain that an exhausted budget stops new
+  agree a `max_nominal_usd` per run, reusing approval already given within scope.
+  Explain that an exhausted budget stops new
   calls and the next run continues from the cache. Completed model chunks
   are saved before the next wave, so an interruption preserves completed work. Changed prompts, claims,
   contact context, evidence, or validation limits require fresh model calls.
@@ -92,9 +94,10 @@ run or quietly fall back to regex for the unprocessed list.
 
 ## 6. Approval
 
-Only after the operator has approved the target description, the claims, the
-offer line, the CTA, and the sample emails, change `status` to `approved` and
-run the full list. Record the approval in the conversation.
+Reuse approval already given for the target description, the claims, the
+offer line, the CTA, and the complete sample sequence. Otherwise obtain the
+missing approval before changing `status` to `approved` and running the full
+list. Record the scope in the conversation.
 
 Draft the complete sequence from this brief using `sequences.md`. Keep fees, claims and asset quantities campaign-specific. New campaigns use conversational defaults unless overridden. Read complete sequence previews before approval; do not re-interview for details already given.
 

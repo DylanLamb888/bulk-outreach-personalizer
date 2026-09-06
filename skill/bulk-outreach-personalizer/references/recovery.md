@@ -16,7 +16,7 @@ Confirm whether the operator wants genuine non-targets and additional company co
 4. For a supported core fit, use validated service and buyer slots in approved templates. If evidence and targeting passed but phrase formatting failed, use a campaign-approved neutral offer. Do not invent a niche, buyer intent or proof to fill the gap.
 5. Keep evidence failures, ambiguous fit and genuine exclusions held with actionable reasons. Do not globally disable gates or relabel every audit row as ready.
 
-Keep commercial claims, neutral pitch variants, eligibility thresholds and follow-up variants in the local campaign or local upload policy. Retain the recovery settings, source mapping, decisions, usage and packaging script for reproducibility.
+Keep commercial claims, neutral pitch variants, eligibility thresholds and follow-up variants in the local campaign. Retain recovery settings, source mapping, decisions, usage and the genuine audit/sidecar bundle for the standard CLI. Follow `sequences.md` when saved state is missing; do not create a campaign-specific packaging script or invent qualification provenance.
 
 ## Delivery checks
 
