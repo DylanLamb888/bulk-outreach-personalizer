@@ -1,6 +1,6 @@
 # Operations guide
 
-[← Back to Bulk Enrich](../README.md)
+[← Back to Bulk Outreach Personalizer](../README.md)
 
 Detailed configuration and CLI reference. Run commands from the repository root.
 For the conversation-led workflow, start with the [shared skill](../skill/bulk-outreach-personalizer/SKILL.md).
@@ -510,7 +510,7 @@ Run `python scripts/enrich.py --help` for the complete interface.
 ## Repository structure
 
 ```text
-bulk-enrich/
+bulk-outreach-personalizer/
 ├── campaigns/
 │   ├── campaign-template.json          # Offer, qualification, copy, and QA template
 │   ├── campaign-template-focus.csv     # Market-rule template
@@ -622,3 +622,10 @@ three priority/plans/company-relevance P.S. variations in the writing reference
 and a "Who handles…" referral breakup, all overridable per campaign. A legacy
 upload without saved qualification state cannot be relabelled as an offline replay.
 
+
+## Naming and compatibility
+
+The project and installed command are named `bulk-outreach-personalizer`.
+The Python import path remains `bulk_enrich`, and `bulk-enrich` remains a
+compatibility command alias. Existing `python3 scripts/enrich.py` commands,
+campaigns and saved research continue to work.

@@ -1,4 +1,4 @@
-"""Command-line interface for Bulk Enrich."""
+"""Command-line interface for Bulk Outreach Personalizer."""
 
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ def _positive_float(value: str) -> float:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="bulk-enrich",
+        prog="bulk-outreach-personalizer",
         description="Validate and run deterministic bulk outreach personalisation.",
     )
     parser.add_argument("--input", required=True, help="Source lead CSV")

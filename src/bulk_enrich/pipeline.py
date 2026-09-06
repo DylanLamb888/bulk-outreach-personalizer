@@ -1492,7 +1492,7 @@ def run_digests(
     write_enriched_csv(output_resolved, data.headers, output_rows, DIGEST_FIELDS)
     status_counts = Counter(signal.status for signal in domain_results.values())
     manifest: dict[str, object] = {
-        "tool": {"name": "bulk-enrich", "version": __version__},
+        "tool": {"name": "bulk-outreach-personalizer", "version": __version__},
         "mode": "digest_only",
         "run": {
             "started_at": started_at.isoformat(),
@@ -1801,7 +1801,7 @@ def run_company_qualification(
     )
     domain_status_counts = Counter(signal.status for signal in domain_results.values())
     manifest: dict[str, object] = {
-        "tool": {"name": "bulk-enrich", "version": __version__},
+        "tool": {"name": "bulk-outreach-personalizer", "version": __version__},
         "mode": "company_qualification_only",
         "campaign": {
             "id": campaign.campaign_id,
@@ -2508,7 +2508,7 @@ def run_enrichment(
         for row in rendered_company_rows.values()
     )
     manifest: dict[str, object] = {
-        "tool": {"name": "bulk-enrich", "version": __version__},
+        "tool": {"name": "bulk-outreach-personalizer", "version": __version__},
         "mode": "outreach_personalization",
         "campaign": {
             "id": campaign.campaign_id,

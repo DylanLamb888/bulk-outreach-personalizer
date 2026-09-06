@@ -168,7 +168,7 @@ class FirecrawlFetcher:
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": f"BulkEnrich/{__version__} Firecrawl fallback",
+            "User-Agent": f"BulkOutreachPersonalizer/{__version__} Firecrawl fallback",
         }
         if self.settings.api_key.strip():
             headers["Authorization"] = f"Bearer {self.settings.api_key.strip()}"

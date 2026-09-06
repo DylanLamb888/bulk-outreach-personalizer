@@ -733,7 +733,7 @@ def _load_sdk() -> Any:
     except ImportError as exc:  # pragma: no cover - exercised only without the extra
         raise LlmFocusError(
             "the anthropic SDK is not installed; install the 'llm' extra "
-            "(pip install 'bulk-enrich[llm]' or uv sync --extra llm)"
+            "(pip install 'bulk-outreach-personalizer[llm]' or uv sync --extra llm)"
         ) from exc
     return anthropic
 
@@ -1026,7 +1026,7 @@ class _CliTransport:
     def workdir(self) -> Path:
         """An empty directory so the CLI loads no project instructions or skills."""
         if self._workdir is None:
-            self._workdir = Path(tempfile.mkdtemp(prefix="bulk-enrich-llm-"))
+            self._workdir = Path(tempfile.mkdtemp(prefix="bulk-outreach-personalizer-llm-"))
         return self._workdir
 
     def argv(self, chunk: list[LlmRequest], output_path: Path) -> list[str]:  # pragma: no cover

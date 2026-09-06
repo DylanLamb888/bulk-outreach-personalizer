@@ -1,4 +1,4 @@
-"""Bulk Enrich package."""
+"""Bulk Outreach Personalizer package."""
 
 __all__ = ["__version__"]
 

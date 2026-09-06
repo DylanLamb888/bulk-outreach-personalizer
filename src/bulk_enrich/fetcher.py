@@ -22,7 +22,7 @@ from bulk_enrich.models import FetchResult
 
 
 DEFAULT_USER_AGENT = (
-    f"Mozilla/5.0 (compatible; BulkEnrich/{__version__}; "
+    f"Mozilla/5.0 (compatible; BulkOutreachPersonalizer/{__version__}; "
     "deterministic public-site enrichment)"
 )
 

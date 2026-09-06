@@ -3,13 +3,15 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bulk-enrich"
+name = "bulk-outreach-personalizer"
 version = "0.13.0"
 description = "Deterministic bulk website enrichment and outreach personalisation"
 requires-python = ">=3.11"
 dependencies = []
 
 [project.scripts]
+bulk-outreach-personalizer = "bulk_enrich.cli:main"
+# Compatibility alias for existing installations and scripts.
 bulk-enrich = "bulk_enrich.cli:main"
 
 [project.optional-dependencies]

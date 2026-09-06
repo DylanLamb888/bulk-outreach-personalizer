@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://bulk-enrich.local/schemas/campaign.schema.json",
-  "title": "Bulk Enrich Campaign",
+  "$id": "https://bulk-outreach-personalizer.local/schemas/campaign.schema.json",
+  "title": "Bulk Outreach Personalizer Campaign",
   "type": "object",
   "additionalProperties": false,
   "required": [

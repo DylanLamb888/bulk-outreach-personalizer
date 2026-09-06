@@ -47,7 +47,7 @@ wheels = [
 ]
 
 [[package]]
-name = "bulk-enrich"
+name = "bulk-outreach-personalizer"
 version = "0.13.0"
 source = { editable = "." }
 

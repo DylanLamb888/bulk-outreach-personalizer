@@ -18,7 +18,7 @@ First emails, follow-ups and a Smartlead import — built from one brief, with c
 
 ## Personalisation with something behind it
 
-Bulk Enrich is a shared **Codex and Claude Code skill**, backed by a Python engine. Give it your list and explain your offer. It researches companies, qualifies prospects and turns approved campaign templates into complete email sequences.
+Bulk Outreach Personalizer is a shared **Codex and Claude Code skill**, backed by a Python engine. Give it your list and explain your offer. It researches companies, qualifies prospects and turns approved campaign templates into complete email sequences.
 
 The assistant handles the brief and copy review. The engine handles batching, caching, validation and exports. You approve the campaign before the full run.
 
