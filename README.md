@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" alt="Bulk Enrich — Good outreach. Built on context. One brief becomes researched companies and complete email sequences." width="1200">
+  <img src="docs/assets/readme-hero.png" alt="Bulk Outreach Personalizer — Good outreach. Built on context. One brief becomes researched companies and complete email sequences." width="1200">
 </p>
 
 <div align="center">
