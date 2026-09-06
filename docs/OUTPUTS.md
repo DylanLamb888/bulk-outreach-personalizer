@@ -126,8 +126,8 @@ Assistant-led upload recovery can produce a separate import and disposition ledg
 
 Campaigns may configure `sequence.followups` with `followup_2a`, `followup_2b`,
 `followup_3a`, and `followup_3b`, plus optional `neutral_followups` with the same
-keys. Templates contain body copy only: the renderer appends the sender and one
-`sequence.ps_variants` entry. A/B variants are alternatives within each step.
+keys. Templates contain body copy only: the renderer appends the sender and,
+according to `sequence.ps_scope`, one `sequence.ps_variants` entry. A/B variants are alternatives within each step.
 `sequence.greeting` defaults to `inline`; `paragraph` preserves the original
 first-email layout. Campaigns without `sequence` retain their previous output.
 `max_followup_words` defaults to 55 including the signature and P.S.; first-email
@@ -164,3 +164,10 @@ CTA/offer-line, sequence and output-limit changes. Changed targeting, claims,
 classification limits, fallback policy, focus rules or title hooks require a new
 enrichment run. Modified audits and legacy audits without a sidecar cannot be
 replayed. Source evidence remains unchanged; outputs must use distinct paths.
+
+
+## One offer across the sequence
+
+Keep one approved asset offer across the sequence and vary the reason to respond: new business, relevant buyers, then a brief offer to send it. Keep fees and quantities in the campaign brief; do not introduce guarantees, buying intent or additional deliverables. Review complete sentences, not just service labels. Store exact wording corrections in `sequence.editorial_replacements` and follow-ups in `sequence.followups`, with approved neutral alternatives for missing slots.
+
+Set `sequence.ps_scope` to `first_only` for a P.S. in email one only. Omitting it preserves the legacy `all` behaviour. New campaign scaffolds use `first_only`. Follow-up signatures remain; length checks include any appended P.S. Use the standard `--render-only` command with a genuine audit sidecar for subsequent copy revisions. Historical CSVs without that sidecar must not be treated as requalified audits.

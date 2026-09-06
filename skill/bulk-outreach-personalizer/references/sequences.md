@@ -5,13 +5,13 @@
 Draft first-email angles and all follow-ups together from the confirmed brief.
 Read the installed cold-email-generator writing rules, but do not import another
 client's commercial terms or assume a generic example format overrides the user.
-Every follow-up should advance the conversation: targeting/detail, practical
-approach, then a short nudge or relevant ownership question. A/B alternatives
+Every follow-up should advance the conversation: a relevant buyer angle, then a short direct offer to send the same asset. Avoid
+process explanations when the approved angle is new-business opportunity. A/B alternatives
 belong within steps 2 and 3, not four consecutive messages.
 
 Configure `sequence.followups` using `followup_2a`, `followup_2b`, `followup_3a`,
 `followup_3b`. Templates contain body text only; the engine adds the sender and
-one P.S. Literal commercial claims must be approved in `offer.approved_claims`;
+a P.S. according to `ps_scope`. Literal commercial claims must be approved in `offer.approved_claims`;
 selected approved CTA/offer sentences can also be reused. The engine checks every
 rendered message, including the first email. Avoid pricing repetition in follow-ups.
 
@@ -69,3 +69,6 @@ map follow-up bodies to their exact exported column names. Do not add another
 signature or P.S. Review live paragraph breaks, sequencing, timing, stop-on-reply
 and opt-out suppression before launch. The file does not configure these settings
 and no upload/send is implied by approval of the copy.
+
+Use `ps_scope: "first_only"` for new campaigns unless the user chooses otherwise.
+Omission means `all` for backward compatibility. Follow-ups still include the sender.

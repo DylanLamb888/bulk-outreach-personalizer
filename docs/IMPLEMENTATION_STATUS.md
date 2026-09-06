@@ -115,3 +115,12 @@ links resolve to the repository-owned replacement. A five-company synthetic
 campaign through the installed skill's resolved CLI path produced five complete
 sequence rows, with no model calls or live website access. Real-list ready-row
 impact was not measured; newly unsafe/incomplete sequences are held explicitly.
+
+
+## One offer across the sequence
+
+Keep one approved asset offer across the sequence and vary the reason to respond: new business, relevant buyers, then a brief offer to send it. Keep fees and quantities in the campaign brief; do not introduce guarantees, buying intent or additional deliverables. Review complete sentences, not just service labels. Store exact wording corrections in `sequence.editorial_replacements` and follow-ups in `sequence.followups`, with approved neutral alternatives for missing slots.
+
+Set `sequence.ps_scope` to `first_only` for a P.S. in email one only. Omitting it preserves the legacy `all` behaviour. New campaign scaffolds use `first_only`. Follow-up signatures remain; length checks include any appended P.S. Use the standard `--render-only` command with a genuine audit sidecar for subsequent copy revisions. Historical CSVs without that sidecar must not be treated as requalified audits.
+
+Validation for the one-offer sequence update: 183 unittest cases pass on both required Python invocations; Ruff F/E9 and skill validation pass. Existing shared installation links remain valid. Tests use no live model calls. The legacy 1,409-row campaign delivery was revised with the same sequence renderer using saved editorial context, preserving eligibility, first emails and subjects; 5,636 follow-ups rendered without P.S. No upload or sending was performed.

@@ -798,3 +798,10 @@ makes no research or model calls. Targeting or classification changes require
 fresh enrichment. The delivery includes held exceptions, a disposition ledger,
 copy review queue, complete previews, mapping instructions and a manifest.
 Editorial review and live Smartlead preview remain separate from automated QA.
+
+
+## One offer across the sequence
+
+Keep one approved asset offer across the sequence and vary the reason to respond: new business, relevant buyers, then a brief offer to send it. Keep fees and quantities in the campaign brief; do not introduce guarantees, buying intent or additional deliverables. Review complete sentences, not just service labels. Store exact wording corrections in `sequence.editorial_replacements` and follow-ups in `sequence.followups`, with approved neutral alternatives for missing slots.
+
+Set `sequence.ps_scope` to `first_only` for a P.S. in email one only. Omitting it preserves the legacy `all` behaviour. New campaign scaffolds use `first_only`. Follow-up signatures remain; length checks include any appended P.S. Use the standard `--render-only` command with a genuine audit sidecar for subsequent copy revisions. Historical CSVs without that sidecar must not be treated as requalified audits.

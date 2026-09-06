@@ -37,6 +37,7 @@ def validate_sequence(data: dict) -> None:
         "followups",
         "neutral_followups",
         "ps_variants",
+        "ps_scope",
         "max_followup_words",
         "editorial_replacements",
         "company_name_overrides",
@@ -45,6 +46,8 @@ def validate_sequence(data: dict) -> None:
         raise ValueError("unknown sequence configuration fields")
     if seq.get("greeting", "inline") not in ("inline", "paragraph"):
         raise ValueError("sequence.greeting must be inline or paragraph")
+    if seq.get("ps_scope", "all") not in ("all", "first_only"):
+        raise ValueError("sequence.ps_scope must be all or first_only")
     limit = seq.get("max_followup_words", 55)
     if type(limit) is not int or not 10 <= limit <= 200:
         raise ValueError("sequence.max_followup_words must be between 10 and 200")
@@ -212,7 +215,9 @@ def render_sequence(
         selling_copy = selling_copy.replace(str(context.get("company_name", "")), "")
         if _unapproved_claim(selling_copy, claims):
             raise ValueError(f"{field}: unapproved figure or commercial promise")
-        if variants:
+        if variants and (
+            seq.get("ps_scope", "all") == "all" or field == "personalized_email"
+        ):
             body += "\n\n" + variants[(base + index) % len(variants)]
         limit = (
             campaign.max_body_words

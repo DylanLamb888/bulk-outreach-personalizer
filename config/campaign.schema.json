@@ -892,6 +892,15 @@
               }
             }
           }
+        },
+        "ps_scope": {
+          "type": "string",
+          "enum": [
+            "all",
+            "first_only"
+          ],
+          "default": "all",
+          "description": "Append P.S. to all messages (legacy default) or first email only."
         }
       }
     }

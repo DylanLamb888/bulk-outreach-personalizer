@@ -40,8 +40,8 @@ actually honour; exporting copy does not implement that action.
 ## Sequence flow
 
 The first email states the offer and a useful next step. Follow-ups clarify the
-targeting or process, then give a short nudge or ask who handles the relevant
-function. Do not repeat pricing or just restate the same question at every step.
+target buyers or the commercial opportunity, then make a short direct offer
+to send the same approved asset. Explain the process only when requested. Do not repeat pricing or just restate the same question at every step.
 Use the prospect's service language without implying the sender delivers that
 service. For example, an outreach agency books meetings for a PR agency; it does
 not offer to run that prospect's PR campaigns.
@@ -58,3 +58,9 @@ Read every unique service/buyer/template combination plus complete sequences for
 every template and evidence/fallback mode. Automated checks cover mechanics;
 human editorial review covers meaning, flow and tone. Save what was reviewed and
 its file hash. Never promise reply rates or label grammatical copy a proven winner.
+
+## Approved commercial frame
+
+One offer, different angles. Lead with the opportunity to win business; never imply leads are already interested or guaranteed clients. Offer to send the asset instead of asking permission to research it. Do not assert it is already completed unless verified. Keep the asset quantity in the campaign, never in generic defaults. Default to first-email-only P.S. (`sequence.ps_scope: first_only`).
+
+Read service phrases aloud inside the actual sentence. Prefer "branding and marketing campaigns" over "branding and marketing creative", "brand campaigns" over "brand campaign creative", and "email design" over "crm email creative" only when website evidence supports design. Save exact supported corrections in the campaign.

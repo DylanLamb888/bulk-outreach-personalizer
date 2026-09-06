@@ -72,6 +72,46 @@ class SequenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing sequence slots"):
             render_sequence(self.config, self.context, "example.test", self.body)
 
+    def test_first_only_ps_preserves_followup_signature_and_length_budget(self):
+        self.config.data["sequence"]["ps_scope"] = "first_only"
+        self.config.data["sequence"]["max_followup_words"] = 10
+        validate_sequence(self.config.data)
+        result = render_sequence(self.config, self.context, "example.test", self.body)
+        self.assertEqual(result["personalized_email"].count("p.s."), 1)
+        for field in FOLLOWUPS:
+            self.assertNotIn("p.s.", result[field])
+            self.assertTrue(result[field].endswith("\n\nDylan"))
+        self.assertEqual(
+            result, render_sequence(self.config, self.context, "example.test", self.body)
+        )
+
+    def test_invalid_ps_scope_rejected(self):
+        for scope in (None, "followups", False):
+            self.config.data["sequence"]["ps_scope"] = scope
+            with self.assertRaisesRegex(ValueError, "ps_scope"):
+                validate_sequence(self.config.data)
+
+    def test_one_offer_buyer_angle_and_neutral_sequence(self):
+        seq = self.config.data["sequence"]
+        seq["ps_scope"] = "first_only"
+        seq["followups"] = {
+            "followup_2a": "We can reach {{buyer_phrase}} to discuss {{company_focus}}. {{cta}}",
+            "followup_2b": "The list gives you prospects to approach about {{company_focus}}. {{cta}}",
+            "followup_3a": "{{first_name}}, shall I send the list?",
+            "followup_3b": "{{cta}}",
+        }
+        seq["neutral_followups"] = {field: "{{cta}}" for field in FOLLOWUPS}
+        self.context["cta"] = "Shall I send you the list?"
+        validate_sequence(self.config.data)
+        result = render_sequence(self.config, self.context, "example.test", self.body)
+        self.assertIn("technology companies", result["followup_2a"])
+        self.assertIn("ai research", result["followup_2b"])
+        self.assertEqual(result["followup_3a"], "Ana, shall I send the list?\n\nDylan")
+        self.context["buyer_phrase"] = ""
+        neutral = render_sequence(self.config, self.context, "example.test", self.body)
+        for field in FOLLOWUPS:
+            self.assertEqual(neutral[field], "Shall I send you the list?\n\nDylan")
+
     def test_bad_followup_blocks_delivery(self):
         self.config.data["sequence"]["followups"]["followup_3b"] = (
             "We guarantee five qualified meetings every week."

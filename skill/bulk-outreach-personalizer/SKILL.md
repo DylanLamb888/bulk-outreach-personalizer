@@ -54,7 +54,9 @@ to the repository. Run `<repository>/scripts/enrich.py` from any working directo
 
 New campaigns start with `Hi {{first_name}} - ...`, ordinary sentences and short
 paragraphs. Follow-ups remain direct replies without repeated greetings. Use
-natural sentence-style opt-outs after the sender, not advertising-style questions.
+natural sentence-style opt-outs after the first-email sender (`ps_scope: first_only`),
+not advertising-style questions. Keep one approved offer across the sequence,
+using different buyer and commercial angles rather than repeating process details.
 Keep these choices overridable per campaign. Fees, quantities, claims and service
 language always come from that campaign, never a previous client's example.
 
